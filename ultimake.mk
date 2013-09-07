@@ -1,7 +1,7 @@
 # Author: Peter Holzer
-# Ultimake v1.08
-# 21.06.2013
-MAKEFILENAME := ultimake-1.08.mk
+# Ultimake v1.09
+# 04.07.2013
+MAKEFILENAME := ultimake-1.09.mk
 #
 # Dieses Makefile kompiliert alle *.cpp und *.c-Files in einem Ordner und seinen Unterordnern
 # und linkt diese zu einer Anwendung bzw. archiviert sie zu einer statischen Bibliothek,
@@ -26,6 +26,52 @@ MAKEFILENAME := ultimake-1.08.mk
 #
 # ======================================================================
 
+
+#   BIN             Name für das fertige Programm, falls ein Programm erstellt werden soll
+#   BIN             Name für das fertige Programm
+#   CC              zu benützender C-Compiler
+#   CXX             zu benützender C++-Compiler
+#   CPPFLAGS        Präprozessor Flags
+#   CFLAGS          C-Compiler Flags
+#   CXXFLAGS        C++-Compiler Flags
+#   TARGET_ARCH
+
+
+
+
+
+#   Tools:
+#       AR          Archiver
+#       CC          C-Compiler
+#       CXX         C++-Compiler
+#       RM          remove
+#       DOXYGEN     doxygen
+#       LINT        lint
+#
+#   Flags:
+#       CPPFLAGS
+#       CFLAGS
+#       CXXFLAGS
+#       LDFLAGS
+#
+#
+#   CSRC    C-Quelltexte
+#   CXXSRC  C++
+#   OBJ
+#   DEP
+
+
+
+
+
+
+
+
+
+
+
+
+
 # HDR    := $(wildcard *.h) $(wildcard *.hpp)
 
 # Wenn C-Quelldateien NICHT manuell angegeben wurden, danach suchen
@@ -40,6 +86,10 @@ ifndef CXXSRC
     CXXSRC += $(foreach DIR, $(SUBDIRS), $(wildcard $(DIR)/*.cpp))
 endif
 
+
+
+
+# Output directory präfix anhängen
 ifdef BIN
     BIN := $(OUT_DIR)/$(BIN)
 endif
@@ -199,6 +249,11 @@ run: all
 
 
 
-
-
-
+# CHANGELOG:
+#
+# v1.09
+#     - added logging functionality
+#
+#
+#
+#
