@@ -1,28 +1,21 @@
 # Author: Peter Holzer
-# Ultimake v1.10
+# Ultimake v1.11
 # 19.09.2013
-# MAKEFILENAME := ultimake-1.10.mk
+# MAKEFILENAME := ultimake-1.11.mk
 
 
 
 
-.SUFFIXES:
-
-# name of THIS makefile
-THIS := $(notdir $(lastword $(MAKEFILE_LIST)))
-# path of THIS makefile
-HERE := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 
-#   @echo 'Dieses Makefile kompiliert alle *.cpp und *.c-Files in einem Ordner und '
-#   @echo 'seinen Unterordnern und linkt diese zu einer Anwendung bzw. archiviert  '
-#   @echo 'sie zu einer statischen Bibliothek, je nachdem, welche Daten angegeben  '
-#   @echo 'werden.                                                                 '
-#   @echo 'Je nachdem, ob man eine Anwendung oder eine Bibliothek erstellen möchte,'
-#   @echo 'kann man die jeweils andere Variable einfach leer lassen.               '
+.DEFAULT : all
 
+.SUFFIXES :
 
-# @echo 'Aufruf: make -f $(MAKEFILENAME)'
+# name of this makefile
+ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
+# path of this makefile
+ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 
 
@@ -31,34 +24,24 @@ HERE := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 #   @echo 'COMPILE.c:                 $(COMPILE.c)'
 #   @echo 'COMPILE.cc:                $(COMPILE.cc)'
 
-
 #=======================================================================
 
 
 # Input related ========================================================
 
 # Search for C/C++ source code files if not specified
+# and cut "./" prefix away
 
-## list of C sources
-#ifndef C_SRC
-#    C_SRC   := $(wildcard *.c)
-#    C_SRC   += $(foreach DIR, $(SUBDIRS), $(wildcard $(DIR)/*.c))
-#endif
-#
-## list of C++ sources
-#ifndef CXX_SRC
-#    CXX_SRC := $(wildcard *.cpp)
-#    CXX_SRC += $(foreach DIR, $(SUBDIRS), $(wildcard $(DIR)/*.cpp))
-#endif
+ifndef C_SRC
+    C_SRC = $(shell find -name '*.c')
+    C_SRC := $(patsubst ./%,%,$(C_SRC))
+endif
 
-# TODO: FIND statt WILDCARD?
-# TODO: keine Module/Subdir mehr nötig
+ifndef CXX_SRC
+    CXX_SRC = $(shell find -name '*.cpp')
+    CXX_SRC := $(patsubst ./%,%,$(CXX_SRC))
+endif
 
-C_SRC = $(shell find -name '*.c')
-CXX_SRC = $(shell find -name '*.cpp')
-
-#    lua/luaconfig.cpp
-# -> ../out/lua/luaconfig.cpp.o
 
 
 # Output related =======================================================
@@ -90,28 +73,19 @@ endif
 # Tools ================================================================
 
 ifndef MKDIR
-    MKDIR := $(shell which mkdir) -p -v
+    MKDIR := mkdir -p -v
 endif
 ifndef RM
-    RM := $(shell which rm) -f
+    RM := rm -f
 endif
 
 
-# TODO: this
-#ools ::
-#	@$(RM)    --version >/dev/null 2>/dev/null || echo 'rm not found!'
-#	@$(MKDIR) --version >/dev/null 2>/dev/null || echo 'mkdir not found!'
-#	@$(CC)    --version >/dev/null 2>/dev/null || echo 'gcc not found!'
-#	@$(CXX)   --version >/dev/null 2>/dev/null || echo 'g++ not found!'
-#	@$(VALAC) --version >/dev/null 2>/dev/null || echo 'valac not found!'
-
-#	@$() --version >/dev/null 2>/dev/null || echo ' not found!'
-
-
-
-
-
-
+ifndef ARFLAGS
+    ARFLAGS := rcsv
+    # r = replace existing or insert new file(s) into the archive
+    # c = do not warn if the library had to be created
+    # s = create an archive index (cf. ranlib)
+endif
 
 
 # Targets ================================================================
@@ -129,8 +103,10 @@ clean :
 help ::
 	@echo '                                                            '
 	@echo 'ultimake                                                    '
-	@echo '    $(THIS)'
-	@echo '    $(HERE)'
+	@echo '    $(ULTIMAKE_NAME)'
+	@echo '    $(ULTIMAKE_PATH)'
+	@echo 'include trace:$(MAKEFILE_LIST)'
+	@echo '                                                            '
 	@echo '                                                            '
 	@echo 'Targets:                                                    '
 	@echo '    all        Create binary/static library                 '
@@ -138,19 +114,14 @@ help ::
 	@echo '    help       Show this text                               '
 	@echo '    run        Run executable                               '
 	@echo '                                                            '
-	@echo '    cppcheck                                                '
-	@echo '    doxygen                                                 '
-	@echo '    lint                                                    '
-	@echo '                                                            '
 	@echo '    *.d                                                     '
 	@echo '    *.o                                                     '
 	@echo '                                                            '
 	@echo '                                                            '
 	@echo 'Targets & Output                                            '
-	@echo '    output folder:          $(OUT)'
+	@echo '    output folder:    OUT:  $(OUT)'
 	@echo '    target binary     BIN:  $(BIN)'
 	@echo '    target library    LIB:  $(LIB)'
-	@echo '    modules (subfolders):  $(SUBDIRS)'
 	@echo '  '
 	@echo '............................................................'
 	@echo 'Flags:'
@@ -158,6 +129,7 @@ help ::
 	@echo -e 'CFLAGS (C compiler flags)    \n    $(CFLAGS:-%=-%\n   )'
 	@echo -e 'CXXFLAGS (C++ compiler flags)\n    $(CXXFLAGS:-%=-%\n   )'
 	@echo -e 'LDFLAGS (Linker flags)       \n    $(LDFLAGS:-%=-%\n   )'
+	@echo -e 'ARFLAGS (Archiver flags)     \n    $(ARFLAGS:-%=-%\n   )'
 	@echo ' '
 	@echo '............................................................'
 	@echo 'Files:'
@@ -232,18 +204,19 @@ $(OUT)/%.cpp.d : %.cpp
 $(BIN) : $(OBJ)
 #	@$(MKDIR) $(@D)
 	@echo 'linking $@'
-	$(CXX) $(LDFLAGS) $(TARGET_ARCH) $(OBJ)
+	@echo '$(CXX) $(LDFLAGS) [...]'
+	$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 
 # Archiving ============================================================
 
-# create static library from object files
+# TODO: create static library from object files
 # .a : .o
 $(LIB) : $(OBJ)
 #	@$(MKDIR) $(@D)
-	@$(RM) -f $@
+#	@$(RM) -f $@
 	@echo 'archiving library'
-	@$(AR) $(ARFLAGS) $@ $^
+	$(AR) $(ARFLAGS) $@ $^
 
 #=======================================================================
 
@@ -251,8 +224,8 @@ $(LIB) : $(OBJ)
 
 
 
-include $(HERE)/dot.mk
-include $(HERE)/devtools.mk
+include $(ULTIMAKE_PATH)/dot.mk
+include $(ULTIMAKE_PATH)/devtools.mk
 
 
 
