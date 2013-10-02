@@ -1,7 +1,6 @@
 # Author: Peter Holzer
-# Ultimake v1.12
-# 29.09.2013
-# MAKEFILENAME := ultimake-1.12.mk
+# Ultimake v1.13
+# 02.10.2013
 
 
 # Configuration ========================================================
@@ -14,7 +13,6 @@ endif
 
 # remove default suffix rules
 .SUFFIXES :
-
 
 # preserve intermediate files
 .SECONDARY:
@@ -33,10 +31,52 @@ ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 
 
-# Input related ========================================================
 
-# find all files in working directory
-FILES := $(shell find -type f)
+# Default Directories ==================================================
+ifndef DEP_DIR
+    DEP_DIR  := .dep
+endif
+ifndef OBJ_DIR
+    OBJ_DIR  := .obj
+endif
+ifndef VAPI_DIR
+    VAPI_DIR  := .vala/vapi
+endif
+ifndef VALA_C_DIR
+    VALA_C_DIR  := .vala/c
+endif
+# Default Tools ========================================================
+ifndef MKDIR
+    MKDIR := mkdir -p -v
+endif
+ifndef MV
+   MV := mv -f
+endif
+ifndef RM
+    RM := rm -f
+endif
+ifndef VALAC
+    VALAC := valac
+endif
+
+
+# Create file lists ====================================================
+
+# if OBJ_DIR is a single dot "."
+ifeq ($(OBJ_DIR),$(filter .,$(OBJ_DIR)))
+    # find all files in working directory
+    FILES := $(shell find -type f)
+else
+    # find all files in working directory but exclude all files in DEP_DIR, OBJ_DIR and VAPI_DIR
+    FILES := $(shell find -type f -not -path "$(DEP_DIR)/*"    -not -path "./$(DEP_DIR)/*"   \
+                                  -not -path "$(OBJ_DIR)/*"    -not -path "./$(OBJ_DIR)/*"   \
+                                  -not -path "$(VAPI_DIR)/*"   -not -path "./$(VAPI_DIR)/*"  \
+                                  -not -path "$(VALA_C_DIR)/*" -not -path "./$(VALA_C_DIR)/*")
+endif
+
+# TODO: Liste für aus Vala generierte C Sourcen lieber aus FILES oder aus VALA_SRC erstellen?
+
+# FILES -> VALA_SRC -> VALA_C_SRC -> DEP -> OBJ
 
 # cut "./" prefix away
 FILES := $(patsubst ./%,%,$(FILES))
@@ -49,86 +89,41 @@ CXX_SRC  := $(filter %.cpp,$(FILES))
 VALA_SRC   := $(filter %.vala,$(FILES))
 VALA_VAPI  := $(VALA_SRC:%.vala=%.vapi)
 VALA_VAPI  := $(addprefix $(VAPI_DIR)/,$(VALA_VAPI))
-VALA_C_SRC := $(VALA_SRC:%.vala=%.c)
+VALA_C_SRC := $(VALA_SRC:%.vala=$(VALA_C_DIR)/%.c)
 C_SRC += $(VALA_C_SRC)
 
-# Output related =======================================================
-# create lists of output files and handle $(OUT) prefix
 
-
-# default value
-ifndef OUT
-    OUT  := .
-endif
-ifndef VAPI_DIR
-    VAPI_DIR  := .
-endif
-
+# create lists of output files and handle $(OBJ_DIR) prefix
 
 # create path to object and dependency file for every source file
 # add output folder prefix
 
+#list of dependency files
+C_DEP    := $(addprefix $(DEP_DIR)/,$(C_SRC:%.c=%.c.d))
+CXX_DEP  := $(addprefix $(DEP_DIR)/,$(CXX_SRC:%.cpp=%.cpp.d))
+DEP := $(C_DEP) $(CXX_DEP)
+# DEP := $(OBJ:%.o=%.d)
+
 # list of object files
-C_OBJ    := $(addprefix $(OUT)/,$(C_SRC:%.c=%.c.o))
-CXX_OBJ  := $(addprefix $(OUT)/,$(CXX_SRC:%.cpp=%.cpp.o))
+C_OBJ    := $(addprefix $(OBJ_DIR)/,$(C_SRC:%.c=%.c.o))
+CXX_OBJ  := $(addprefix $(OBJ_DIR)/,$(CXX_SRC:%.cpp=%.cpp.o))
 OBJ := $(C_OBJ) $(CXX_OBJ)
-#OBJ := $(addprefix $(OUT)/,$(C_SRC:%.c=%.c.o) $(CXX_SRC:%.cpp=%.cpp.o))
-# list of dependency files
-#DEP := $(addprefix $(OUT)/,$(C_SRC:%.c=%.c.d) $(CXX_SRC:%.cpp=%.cpp.d))
-DEP := $(OBJ:%.o=%.d)
 
-
-
-# add output folder prefix
-ifdef BIN
-    BIN := $(OUT)/$(BIN)
-endif
-ifdef LIB
-    LIB := $(OUT)/$(LIB)
-endif
-
-
-# Default Tools ========================================================
-
-ifndef MKDIR
-    MKDIR := mkdir -p -v
-endif
-#ifndef MV
-#    MV := mv
-#endif
-ifndef RM
-    RM := rm -f
-endif
-ifndef VALAC
-    VALAC := valac
-endif
-
-ifndef ARFLAGS
-    ARFLAGS := rcsv
-#   r = replace existing or insert new file(s) into the archive
-#   c = do not warn if the library had to be created
-#   s = create an archive index (cf. ranlib)
-#   v = be verbose
-endif
-
-
-ifndef CC
-    # CC := echo
-endif
 
 # Targets ================================================================
 .PHONY : all clean help run tools
 
 
-
-
 -include $(DEP)
 
+
 all : $(BIN) $(LIB)
+
 
 clean :
 	@echo 'Cleaning ...'
 	$(AT)-$(RM) $(BIN) $(LIB) $(OBJ) $(DEP)
+
 
 clean-all :
 	@echo 'Cleaning everything...'
@@ -138,9 +133,9 @@ clean-all :
 help ::
 	@echo '                                                            '
 	@echo 'ultimake                                                    '
-	@echo '    $(ULTIMAKE_NAME)'
-	@echo '    $(ULTIMAKE_PATH)'
-	@echo 'include trace:$(MAKEFILE_LIST)'
+	@echo 'filename: $(ULTIMAKE_NAME)'
+	@echo 'location: $(ULTIMAKE_PATH)'
+	@echo 'Usage: make -f $(ULTIMAKE_NAME)'
 	@echo '                                                            '
 	@echo '                                                            '
 	@echo 'Targets:                                                    '
@@ -154,7 +149,7 @@ help ::
 	@echo '                                                            '
 	@echo '                                                            '
 	@echo 'Targets & Output                                            '
-	@echo '    output folder:    OUT:       $(OUT)'
+	@echo '    output folder:    OBJ_DIR:   $(OBJ_DIR)'
 	@echo '    vapi folder:      VAPI_DIR:  $(VAPI_DIR)'
 	@echo '    target binary     BIN:       $(BIN)'
 	@echo '    target library    LIB:       $(LIB)'
@@ -169,14 +164,24 @@ help ::
 	@echo ' '
 	@echo '............................................................'
 	@echo 'Files:'
-	@echo -e 'FILES                   \n    $(FILES:%=%\n   )'
-	@echo -e 'VALA_SRC (Vala sources) \n    $(VALA_SRC:%=%\n   )'
-	@echo -e 'VALA_VAPI               \n    $(VALA_VAPI:%=%\n   )'
-	@echo -e 'VALA_C_SRC              \n    $(VALA_C_SRC:%=%\n   )'
-	@echo -e 'C_SRC (C sources)       \n    $(C_SRC:%=%\n   )'
-	@echo -e 'CXX_SRC (C++ sources)   \n    $(CXX_SRC:%=%\n   )'
-	@echo -e 'OBJ (object files)      \n    $(OBJ:%=%\n   )'
-	@echo -e 'DEP (dependencies)      \n    $(DEP:%=%\n   )'
+	@echo -e 'FILES (all files, excludes OBJ_DIR and VAPI_DIR)'
+	@echo -e '    $(FILES:%=%\n   )'
+	@echo -e 'VALA_SRC (Vala sources)'
+	@echo -e '    $(VALA_SRC:%=%\n   )'
+	@echo -e 'VALA_VAPI (.vapi files generated from .vala)'
+	@echo -e '    $(VALA_VAPI:%=%\n   )'
+	@echo -e 'VALA_C_SRC (.c files generated from .vala and vapi)'
+	@echo -e '    $(VALA_C_SRC:%=%\n   )'
+	@echo -e 'C_SRC (C sources)'
+	@echo -e '    $(C_SRC:%=%\n   )'
+	@echo -e 'CXX_SRC (C++ sources)'
+	@echo -e '    $(CXX_SRC:%=%\n   )'
+	@echo -e 'OBJ (object files)'
+	@echo -e '    $(OBJ:%=%\n   )'
+	@echo -e 'DEP (dependencies)'
+	@echo -e '    $(DEP:%=%\n   )'
+	@echo -e 'MAKEFILE_LIST (include trace)'
+	@echo -e '    $(MAKEFILE_LIST:%=%\n   )'
 	@echo '  '
 	@echo '  '
 
@@ -205,65 +210,49 @@ tools ::
 
 # Object files .........................................................
 # compile object files from C sources
-$(OUT)/%.c.o : %.c $(OUT)/%.c.d
-#	$(AT)$(MKDIR) $(@D)
-#	@echo 'compiling $<'
-	@echo 'creating  $@'
+$(OBJ_DIR)/%.c.o : %.c $(DEP_DIR)/%.c.d
+	$(AT)$(MKDIR) $(@D)
+	@echo 'creating $@'
 	$(AT)$(COMPILE.c) $< -o $@
 
 
 # compile object files from C++ sources
-$(OUT)/%.cpp.o : %.cpp $(OUT)/%.cpp.d
-#	$(AT)$(MKDIR) $(@D)
-#	@echo 'compiling $<'
-	@echo 'creating  $@'
+$(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.d
+	$(AT)$(MKDIR) $(@D)
+	@echo 'creating $@'
 	$(AT)$(COMPILE.cc) $< -o $@
 
 
 # Dependency files .....................................................
 # generate dependencies from C sources
-$(OUT)/%.c.d : %.c
+$(DEP_DIR)/%.c.d : %.c
 	$(AT)$(MKDIR) $(@D)
-#	@echo -e 'creating dependency from $<'
-	@echo 'creating  $@'
-	$(AT)$(CC) -I. -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT)/$(<:%.c=%.c.o)" "$<"
+	@echo 'creating $@'
+	$(AT)$(CC) -I. -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" "$<"
 
 
 # generate dependencies from C sources
-$(OUT)/%.cpp.d : %.cpp
+$(DEP_DIR)/%.cpp.d : %.cpp
 	$(AT)$(MKDIR) $(@D)
-#	@echo -e 'creating dependency from $<'
-	@echo 'creating  $@'
-	$(AT)$(CC) -I. -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(OUT)/$(<:%.cpp=%.cpp.o)" "$<"
+	@echo 'creating $@'
+#	$(AT)$(CC) -I. -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" "$<"
+	$(AT)$(CC) -I. -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(@:%.cpp.d=%.cpp.o)" "$<"
 
 
 # Vala .................................................................
-# create all vala-c sources from all vala sources
-#$(VALA_C_SRC) : $(VALA_SRC) $(VALA_VAPI)
-#	@echo 'compiling $(VALA_SRC)'
-#	$(AT)$(VALAC) $(VALAFLAGS) --ccode $(VALA_SRC)
-
-# .INTERMEDIATE : %.vapi $(VALA_VAPI)
-
-
-
-# $(VALA_C_SRC) : $(VALA_SRC) $(VALA_VAPI)
-# $(VALA_SRC) : $(VALA_VAPI)
-
-
-%.c : %.vala $(VALA_VAPI)
-#	@echo '$(VALAC) $<'
-	@echo 'creating  $@'
+# generate C code from Vala
+$(VALA_C_DIR)/%.c : %.vala $(VALA_VAPI)
+	$(AT)$(MKDIR) $(@D)
+	@echo 'creating $@'
 	$(AT)$(VALAC) $(VALAFLAGS) --ccode $< \
 		$(foreach vapi,$(filter-out $(VAPI_DIR)/$*.vapi,$(VALA_VAPI)),--use-fast-vapi=$(vapi))
 #	$(AT)$(VALAC) $(VALAFLAGS) --ccode $(VALA_SRC) $(foreach vapi,$(VALA_VAPI),--use-fast-vapi=$(VAPI_DIR)/$(vapi))
+	$(AT)$(MV) $*.c $@
 
-
+# create vapi from Vala
 $(VAPI_DIR)/%.vapi : %.vala
 	$(AT)$(MKDIR) $(@D)
-# %.vapi : %.vala
-#	@echo 'creating vapi from $<'
-	@echo 'creating  $@'
+	@echo 'creating $@'
 	$(AT)$(VALAC) $< --fast-vapi=$@
 
 
@@ -271,7 +260,7 @@ $(VAPI_DIR)/%.vapi : %.vala
 # Linking ..............................................................
 # link object files into binary # $(VALA_C_SRC)
 $(BIN) : $(OBJ)
-#	$(AT)$(MKDIR) $(@D)
+	$(AT)$(MKDIR) $(@D)
 	@echo 'linking  $@'
 	$(AT)$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
@@ -279,16 +268,13 @@ $(BIN) : $(OBJ)
 # Archiving ............................................................
 # create static library from object files
 $(LIB) : $(OBJ)
-#	$(AT)$(MKDIR) $(@D)
-#	$(AT)$(RM) -f $@
-	@echo 'archiving $@'
-#	@echo 'archiving library'
-	$(AR) $(ARFLAGS) $@ $^
+	$(AT)$(MKDIR) $(@D)
+	@echo 'removing $@'
+	$(AT)$(RM) $@
+	@echo 'creating $@'
+	$(AR) rcs $@ $^
 
 #=======================================================================
-
-
-
 
 
 include $(ULTIMAKE_PATH)/dot.mk
@@ -296,10 +282,14 @@ include $(ULTIMAKE_PATH)/devtools.mk
 
 
 
-
-
-
 # CHANGELOG:
+#
+# v1.13
+#     - divided directories for object files and dependencies
+#     - new directories for vala-generated c files
+#     - new default locations (hidden, start with dot)
+#     - binaries and libs are no more tied to the object folder
+#
 # v1.12
 #     - introduced FILES
 #
