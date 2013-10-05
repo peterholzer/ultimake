@@ -1,5 +1,5 @@
 # Author: Peter Holzer
-# Ultimake v1.14
+# Ultimake v1.15
 # 04.10.2013
 
 
@@ -7,7 +7,7 @@
 
 # define DEBUG_ULTIMAKE to show executed commands
 ifndef DEBUG_ULTIMAKE
-    # AT := @
+    AT := @
 endif
 
 
@@ -16,7 +16,7 @@ endif
 .SUFFIXES :
 
 # preserve intermediate files
-.SECONDARY:
+.SECONDARY :
 
 
 # name of this makefile
@@ -25,22 +25,31 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 # path of this makefile
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
+# TODO: add current directory to include search list to allow relative locations
+CPPFLAGS += -I.
+
+CFLAGS += -std=c99
 
 
 # Default output file, when no BIN or LIB is defined ===================
-ifndef BIN
-    ifndef LIB
-        BIN = a.out
-    endif
+ifndef LIB
+    BIN ?= a.out
 endif
 
+
 # Default Directories ==================================================
-DEP_DIR  ?= ./.dep
-OBJ_DIR  ?= ./.obj
-VAPI_DIR  ?= ./.vala/vapi
-VALA_C_DIR  ?= ./.vala/c
+# TODO: for some reason, there is absolutely no leading "./" allowed,
+#       otherwise the %-rules wont work
+#       this makes half of the "-not" statements at the creation of the
+#       FILES variable useless
+DEP_DIR    ?= .dep
+OBJ_DIR    ?= .obj
+VAPI_DIR   ?= .vala/vapi
+VALA_C_DIR ?= .vala/c
+
 
 # Default Tools ========================================================
+
 MKDIR ?= mkdir -p -v
 MV ?= mv -f
 RM ?= rm -f
@@ -48,52 +57,40 @@ RM ?= rm -f
 VALAC ?= valac
 
 
-
-# Create file lists ====================================================
+# Create lists of existing files =======================================
 
 # find all files in working directory
 # but exclude all files in DEP_DIR, OBJ_DIR, VAPI_DIR and VALA_C_DIR
-FILES := $(shell find -type f -not -path "$(DEP_DIR)/*"    -not -path "./$(DEP_DIR)/*"   \
-                              -not -path "$(OBJ_DIR)/*"    -not -path "./$(OBJ_DIR)/*"   \
-                              -not -path "$(VAPI_DIR)/*"   -not -path "./$(VAPI_DIR)/*"  \
-                              -not -path "$(VALA_C_DIR)/*" -not -path "./$(VALA_C_DIR)/*")
+# TODO: fix this leading "./" problem
+FILES := $(shell find -L -type f -not -path "$(DEP_DIR)/*"    -not -path "./$(DEP_DIR)/*"   \
+                                 -not -path "$(OBJ_DIR)/*"    -not -path "./$(OBJ_DIR)/*"   \
+                                 -not -path "$(VAPI_DIR)/*"   -not -path "./$(VAPI_DIR)/*"  \
+                                 -not -path "$(VALA_C_DIR)/*" -not -path "./$(VALA_C_DIR)/*")
 
 # cut "./" prefix away
 FILES := $(patsubst ./%,%,$(FILES))
-
 
 # filter C/C++/Vala sources
 C_SRC    ?= $(filter %.c,$(FILES))
 CXX_SRC  ?= $(filter %.cpp,$(FILES))
 VALA_SRC ?= $(filter %.vala,$(FILES))
 
-# create list of vala, vapi and generated c sources, add the last to the list of c sources
 
+# Create lists of generated files ======================================
+
+# create list of vapi files from vala sources
 VALA_VAPI  := $(VALA_SRC:%.vala=$(VAPI_DIR)/%.vapi)
+
+# create list of vala-generated c sources from vala sources and add it to the list of c sources
 VALA_C_SRC := $(VALA_SRC:%.vala=$(VALA_C_DIR)/%.c)
 C_SRC += $(VALA_C_SRC)
-
-
-# create list of dependency files and handle $(DEP_DIR) prefix
-# C_DEP    := $(addprefix $(DEP_DIR)/,$(C_SRC:%.c=%.c.d))
-# CXX_DEP  := $(addprefix $(DEP_DIR)/,$(CXX_SRC:%.cpp=%.cpp.d))
-# C_DEP    := $(C_SRC:%.c=$(DEP_DIR)/%.c.d)
-# CXX_DEP  := $(CXX_SRC:%.cpp=$(DEP_DIR)/%.cpp.d)
-# DEP := $(C_DEP) $(CXX_DEP)
-
-
-# create list of object files and handle $(OBJ_DIR) prefix
-# C_OBJ    := $(C_SRC:%.c=$(OBJ_DIR)/%.c.o)
-# CXX_OBJ  := $(CXX_SRC:%.cpp=$(OBJ_DIR)/%.cpp.o)
-# C_OBJ    := $(addprefix $(OBJ_DIR)/,$(C_SRC:%.c=%.c.o))
-# CXX_OBJ  := $(addprefix $(OBJ_DIR)/,$(CXX_SRC:%.cpp=%.cpp.o))
-# OBJ := $(C_OBJ) $(CXX_OBJ)
 
 # create list of dependency files from sources and handle $(DEP_DIR) prefix
 DEP := $(C_SRC:%.c=$(DEP_DIR)/%.c.d) $(CXX_SRC:%.cpp=$(DEP_DIR)/%.cpp.d)
 
 # create list of object files from sources and handle $(OBJ_DIR) prefix
 OBJ := $(C_SRC:%.c=$(OBJ_DIR)/%.c.o) $(CXX_SRC:%.cpp=$(OBJ_DIR)/%.cpp.o)
+
 
 # Targets ==============================================================
 
@@ -129,34 +126,41 @@ help ::
 
 help-files ::
 	@echo 'Output files'
-	@echo '    target binary            BIN:        $(BIN)'
-	@echo '    target library           LIB:        $(LIB)'
+	@echo '    target binary (BIN)'
+	@echo '        $(BIN)'
+	@echo '    target library (LIB)'
+	@echo '        $(LIB)'
 	@echo ' '
 	@echo 'Output folders'
-	@echo '    dependency files:        DEP_DIR:    $(DEP_DIR)'
-	@echo '    object files:            OBJ_DIR:    $(OBJ_DIR)'
-	@echo '    vala-generated c-code:   VALA_C_SRC: $(VALA_C_SRC)'
-	@echo '    vapi files:              VAPI_DIR:   $(VAPI_DIR)'
+	@echo '    location of dependency files (DEP_DIR)'
+	@echo '        $(DEP_DIR)'
+	@echo '    location of object files (OBJ_DIR)'
+	@echo '        $(OBJ_DIR)'
+	@echo '    location of vala-generated c-code (VALA_C_DIR)'
+	@echo '        $(VALA_C_DIR)'
+	@echo '    location of vapi files (VAPI_DIR)'
+	@echo '        $(VAPI_DIR)'
 	@echo '  '
 	@echo '............................................................'
 	@echo 'Files:'
-	@echo -e 'FILES (all files, excludes DEP_DIR, OBJ_DIR, VALA_C_DIR and VAPI_DIR)'
+	@echo -e 'all files (FILES)'
+	@echo -e 'excludes DEP_DIR, OBJ_DIR, VALA_C_DIR and VAPI_DIR'
 	@echo -e '    $(FILES:%=%\n   )'
-	@echo -e 'VALA_SRC (Vala sources)'
+	@echo -e 'vala sources (VALA_SRC)'
 	@echo -e '    $(VALA_SRC:%=%\n   )'
-	@echo -e 'VALA_VAPI (.vapi files generated from .vala)'
+	@echo -e 'vapi files generated from .vala (VALA_VAPI)'
 	@echo -e '    $(VALA_VAPI:%=%\n   )'
-	@echo -e 'VALA_C_SRC (.c files generated from .vala and vapi)'
+	@echo -e 'c files generated from .vala and vapi (VALA_C_SRC)'
 	@echo -e '    $(VALA_C_SRC:%=%\n   )'
-	@echo -e 'C_SRC (C sources)'
+	@echo -e 'C sources (C_SRC)'
 	@echo -e '    $(C_SRC:%=%\n   )'
-	@echo -e 'CXX_SRC (C++ sources)'
+	@echo -e 'C++ sources (CXX_SRC)'
 	@echo -e '    $(CXX_SRC:%=%\n   )'
-	@echo -e 'OBJ (object files)'
+	@echo -e 'object files (OBJ)'
 	@echo -e '    $(OBJ:%=%\n   )'
-	@echo -e 'DEP (dependencies)'
+	@echo -e 'dependencies (DEP)'
 	@echo -e '    $(DEP:%=%\n   )'
-	@echo -e 'MAKEFILE_LIST (include trace)'
+	@echo -e 'include trace (MAKEFILE_LIST)'
 	@echo -e '    $(MAKEFILE_LIST:%=%\n   )'
 	@echo '  '
 
@@ -184,10 +188,9 @@ help-tools ::
 	@echo -e 'ARFLAGS (Archiver flags)     \n    $(ARFLAGS :%=%\n   )'
 
 
-
-
-run: all
+run : $(BIN)
 	./$(BIN)
+
 
 
 
@@ -262,20 +265,26 @@ $(LIB) : $(OBJ)
 
 #=======================================================================
 
-
+-include $(DEP)
 include $(ULTIMAKE_PATH)/dot.mk
 include $(ULTIMAKE_PATH)/devtools.mk
 # include $(ULTIMAKE_PATH)/gcc-warnings.mk
 
 # TODO: the dependency files have to be included after all rules,
 #       because otherwise every included file will be built BEFORE the
-#       target is created
+#       target is created COMPLETELY WRONG. Included targets will always
+#       built, even if several intermediate files are neded, for example
+#       .vala -> .vapi,.c -> .d
 # if an included file does not exist but a rule exists, it will be created
--include $(DEP)
 
 
 
 # CHANGELOG ############################################################
+#
+#
+# v1.15
+#     - refactored creation of file lists
+#     - include order statement from v1.14 is wrong
 #
 # v1.14
 #     - corrected include order. include statements are now after all
@@ -301,6 +310,7 @@ include $(ULTIMAKE_PATH)/devtools.mk
 # v1.09
 #     - added logging functionality
 #
-#
-#
-#
+
+
+
+
