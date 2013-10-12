@@ -1,15 +1,19 @@
 # Author: Peter Holzer
-# Ultimake v1.15
-# 04.10.2013
+# Ultimake v1.16
+# 12.10.2013
 
 
 # Configuration ========================================================
 
 # define DEBUG_ULTIMAKE to show executed commands
 ifndef DEBUG_ULTIMAKE
-    AT := @
+    # AT := @
 endif
 
+# TODO: add current directory to include search list to allow relative locations
+# CPPFLAGS += -I.
+
+# SRC_DIRS ?= .
 
 
 # remove default suffix rules
@@ -25,10 +29,9 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 # path of this makefile
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
-# TODO: add current directory to include search list to allow relative locations
-CPPFLAGS += -I.
 
-CFLAGS += -std=c99
+
+# CFLAGS += -std=c99
 
 
 # Default output file, when no BIN or LIB is defined ===================
@@ -62,10 +65,21 @@ VALAC ?= valac
 # find all files in working directory
 # but exclude all files in DEP_DIR, OBJ_DIR, VAPI_DIR and VALA_C_DIR
 # TODO: fix this leading "./" problem
-FILES := $(shell find -L -type f -not -path "$(DEP_DIR)/*"    -not -path "./$(DEP_DIR)/*"   \
-                                 -not -path "$(OBJ_DIR)/*"    -not -path "./$(OBJ_DIR)/*"   \
-                                 -not -path "$(VAPI_DIR)/*"   -not -path "./$(VAPI_DIR)/*"  \
-                                 -not -path "$(VALA_C_DIR)/*" -not -path "./$(VALA_C_DIR)/*")
+FILES := $(foreach dir,$(SRC_DIRS), \
+            $(shell find $(dir) -type f -not -path "$(DEP_DIR)/*"    -not -path "./$(DEP_DIR)/*"   \
+                                    -not -path "$(OBJ_DIR)/*"    -not -path "./$(OBJ_DIR)/*"   \
+                                    -not -path "$(VAPI_DIR)/*"   -not -path "./$(VAPI_DIR)/*"  \
+                                    -not -path "$(VALA_C_DIR)/*" -not -path "./$(VALA_C_DIR)/*"))
+
+
+SRC_DIRS := $(foreach dir,$(SRC_DIRS),$(patsubst /%, /%, $(realpath $(dir))))
+
+
+
+# CPPFLAGS += $(foreach dir,$(SRC_DIRS), -I$(realpath $(dir)))
+CPPFLAGS_INC := $(foreach dir,$(SRC_DIRS), -I$(dir))
+CPPFLAGS += $(CPPFLAGS_INC)
+
 
 # cut "./" prefix away
 FILES := $(patsubst ./%,%,$(FILES))
@@ -217,14 +231,14 @@ $(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.d
 $(DEP_DIR)/%.c.d : %.c
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
-	$(AT)$(CC) -I. -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" "$<"
+	$(AT)$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" "$<"
 
 
 # generate dependencies from C sources
 $(DEP_DIR)/%.cpp.d : %.cpp
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
-	$(AT)$(CC) -I. -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" "$<"
+	$(AT)$(CC) $(CPPFLAGS_INC) -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" "$<"
 #	$(AT)$(CC) -I. -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(@:%.cpp.d=%.cpp.o)" "$<"
 
 
