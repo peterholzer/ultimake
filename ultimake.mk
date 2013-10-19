@@ -1,6 +1,6 @@
 # Author: Peter Holzer
-# Ultimake v1.16
-# 12.10.2013
+# Ultimake v1.17
+# 18.10.2013
 
 
 # Configuration ========================================================
@@ -12,15 +12,23 @@ endif
 
 # TODO: add current directory to include search list to allow relative locations
 # CPPFLAGS += -I.
-
-# SRC_DIRS ?= .
+# TODO: SOURCES and INCLUDES default values
+# SOURCES ?= .
 
 
 # remove default suffix rules
 .SUFFIXES :
+# The prerequisites of the special target .SUFFIXES are the list of suffixes
+# to be used in checking for suffix rules. See Old-Fashioned Suffix Rules.
 
 # preserve intermediate files
 .SECONDARY :
+# The targets which .SECONDARY depends on are treated as intermediate files,
+# except that they are never automatically deleted. See Chains of Implicit Rules.
+# .SECONDARY with no prerequisites causes all targets to be treated as secondary
+# (i.e., no target is removed because it is considered intermediate).
+
+# TODO: reintroduce OUT_DIR but this time additionally to DEP_DIR and OBJ_DIR
 
 
 # name of this makefile
@@ -30,9 +38,7 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 
-
 # CFLAGS += -std=c99
-
 
 # Default output file, when no BIN or LIB is defined ===================
 ifndef LIB
@@ -53,11 +59,34 @@ VALA_C_DIR ?= .vala/c
 
 # Default Tools ========================================================
 
+VALAC ?= valac
+
 MKDIR ?= mkdir -p -v
 MV ?= mv -f
 RM ?= rm -f
 
-VALAC ?= valac
+# Zusammensetzung der Dateipfade:
+# SOURCES ... OBJ_DIR ... `find ..`
+#
+#    .                        test/test.c
+#    .         /  .obj   /    test/test.o
+#
+#  ~/sync/lib  /         /    test/test.c
+#  ~/sync/lib  /  .obj   /    test/test.o
+
+
+# TODO: new approach for FILE list creation. instead of giving find the location as parameter, cd to the source directory and call "find ."
+# TODO: try to avoid absolute paths and
+# TODO: do not forget about the leading "./" problem
+
+# executes find on several directories and allows several exclude paths
+# usage;
+#     $(call find_exclude,$(SEARCH_DIR),$(EXCLUDE_DIR))
+# executes something like:
+#     find $1 -type f -not -path $2
+# $(1)  search directory
+# $(2)  exclude directory
+find_exclude = $(foreach dir,$(1), $(shell find $(dir) -type f $(foreach p,$(2), -not -path "$(p)/*" -not -path "./$(p)/*")))
 
 
 # Create lists of existing files =======================================
@@ -65,24 +94,16 @@ VALAC ?= valac
 # find all files in working directory
 # but exclude all files in DEP_DIR, OBJ_DIR, VAPI_DIR and VALA_C_DIR
 # TODO: fix this leading "./" problem
-FILES := $(foreach dir,$(SRC_DIRS), \
-            $(shell find $(dir) -type f -not -path "$(DEP_DIR)/*"    -not -path "./$(DEP_DIR)/*"   \
-                                    -not -path "$(OBJ_DIR)/*"    -not -path "./$(OBJ_DIR)/*"   \
-                                    -not -path "$(VAPI_DIR)/*"   -not -path "./$(VAPI_DIR)/*"  \
-                                    -not -path "$(VALA_C_DIR)/*" -not -path "./$(VALA_C_DIR)/*"))
-
-
-SRC_DIRS := $(foreach dir,$(SRC_DIRS),$(patsubst /%, /%, $(realpath $(dir))))
-
-
-
-# CPPFLAGS += $(foreach dir,$(SRC_DIRS), -I$(realpath $(dir)))
-CPPFLAGS_INC := $(foreach dir,$(SRC_DIRS), -I$(dir))
-CPPFLAGS += $(CPPFLAGS_INC)
-
+FILES := $(call find_exclude,$(SOURCES), $(DEP_DIR) $(OBJ_DIR) $(VAPI_DIR) $(VALA_C_DIR))
 
 # cut "./" prefix away
 FILES := $(patsubst ./%,%,$(FILES))
+
+# TODO: add description for SOURCES and INCLUDES
+SOURCES := $(foreach dir,$(SOURCES),$(patsubst /%, /%, $(realpath $(dir))))
+
+CPPFLAGS_INC := $(foreach include,$(INCLUDES),-I$(include))
+CPPFLAGS += $(CPPFLAGS_INC)
 
 # filter C/C++/Vala sources
 C_SRC    ?= $(filter %.c,$(FILES))
@@ -95,16 +116,18 @@ VALA_SRC ?= $(filter %.vala,$(FILES))
 # create list of vapi files from vala sources
 VALA_VAPI  := $(VALA_SRC:%.vala=$(VAPI_DIR)/%.vapi)
 
-# create list of vala-generated c sources from vala sources and add it to the list of c sources
+# create list of vala-generated C source files from vala sources and add it to the list of C source files
 VALA_C_SRC := $(VALA_SRC:%.vala=$(VALA_C_DIR)/%.c)
 C_SRC += $(VALA_C_SRC)
 
 # create list of dependency files from sources and handle $(DEP_DIR) prefix
-DEP := $(C_SRC:%.c=$(DEP_DIR)/%.c.d) $(CXX_SRC:%.cpp=$(DEP_DIR)/%.cpp.d)
+DEP := $(C_SRC:%.c=$(DEP_DIR)/%.c.dep) $(CXX_SRC:%.cpp=$(DEP_DIR)/%.cpp.dep)
 
 # create list of object files from sources and handle $(OBJ_DIR) prefix
 OBJ := $(C_SRC:%.c=$(OBJ_DIR)/%.c.o) $(CXX_SRC:%.cpp=$(OBJ_DIR)/%.cpp.o)
 
+# OBJ := $(foreach sources,$(SOURCES),$(filter $(sources)%,$(C_SRC:sources%.c=$(OBJ_DIR)/%.c.o)))
+# OBJ := $(foreach sources,$(SOURCES),$(patsubst $(sources)/%.c, $(sources)/$(OBJ_DIR)/%.c.o, $(filter $(sources)%,$(C_SRC))))
 
 # Targets ==============================================================
 
@@ -116,90 +139,11 @@ all : $(BIN) $(LIB)
 
 clean :
 	@echo 'Cleaning ...'
-	$(AT)-$(RM) $(BIN) $(LIB) $(OBJ) $(DEP) $(VALA_VAPI) $(VALA_C_SRC)
-
-
-help ::
-	@echo '                                                            '
-	@echo 'ultimake                                                    '
-	@echo 'filename: $(ULTIMAKE_NAME)'
-	@echo 'location: $(ULTIMAKE_PATH)'
-	@echo 'Usage: make -f $(ULTIMAKE_NAME)'
-	@echo '                                                            '
-	@echo 'Targets:                                                    '
-	@echo '    all        Create binary/static library                 '
-	@echo '    clean      Clean only binaries and dependencies         '
-	@echo '    help       Show this text                               '
-	@echo '    help-files Show file lists                              '
-	@echo '    help-tools Show tools configuration                     '
-	@echo '    run        Run executable                               '
-	@echo '                                                            '
-	@echo '                                                            '
-	@echo '                                                            '
-
-
-help-files ::
-	@echo 'Output files'
-	@echo '    target binary (BIN)'
-	@echo '        $(BIN)'
-	@echo '    target library (LIB)'
-	@echo '        $(LIB)'
-	@echo ' '
-	@echo 'Output folders'
-	@echo '    location of dependency files (DEP_DIR)'
-	@echo '        $(DEP_DIR)'
-	@echo '    location of object files (OBJ_DIR)'
-	@echo '        $(OBJ_DIR)'
-	@echo '    location of vala-generated c-code (VALA_C_DIR)'
-	@echo '        $(VALA_C_DIR)'
-	@echo '    location of vapi files (VAPI_DIR)'
-	@echo '        $(VAPI_DIR)'
-	@echo '  '
-	@echo '............................................................'
-	@echo 'Files:'
-	@echo -e 'all files (FILES)'
-	@echo -e 'excludes DEP_DIR, OBJ_DIR, VALA_C_DIR and VAPI_DIR'
-	@echo -e '    $(FILES:%=%\n   )'
-	@echo -e 'vala sources (VALA_SRC)'
-	@echo -e '    $(VALA_SRC:%=%\n   )'
-	@echo -e 'vapi files generated from .vala (VALA_VAPI)'
-	@echo -e '    $(VALA_VAPI:%=%\n   )'
-	@echo -e 'c files generated from .vala and vapi (VALA_C_SRC)'
-	@echo -e '    $(VALA_C_SRC:%=%\n   )'
-	@echo -e 'C sources (C_SRC)'
-	@echo -e '    $(C_SRC:%=%\n   )'
-	@echo -e 'C++ sources (CXX_SRC)'
-	@echo -e '    $(CXX_SRC:%=%\n   )'
-	@echo -e 'object files (OBJ)'
-	@echo -e '    $(OBJ:%=%\n   )'
-	@echo -e 'dependencies (DEP)'
-	@echo -e '    $(DEP:%=%\n   )'
-	@echo -e 'include trace (MAKEFILE_LIST)'
-	@echo -e '    $(MAKEFILE_LIST:%=%\n   )'
-	@echo '  '
-
-
-help-tools ::
-	@echo '............................................................'
-	@echo 'Tools:'
-	@echo '    archiver             AR:       $(AR)'
-	@echo '    C preprocessor       CPP:      $(CPP)'
-	@echo '    C compiler           CC:       $(CC)'
-	@echo '    C++ compiler         CXX:      $(CXX)'
-	@echo '    vala compiler        VALAC:    $(VALAC)'
-	@echo '    linker               LD:       $(LD)'
-	@echo '  '
-	@echo '    move                 MV:       $(MV)'
-	@echo '    remove               RM:       $(RM)'
-	@echo '    mkdir                MKDIR:    $(MKDIR)'
-	@echo '  '
-	@echo '............................................................'
-	@echo 'Flags:'
-	@echo -e 'CPPFLAGS (preprocessor flags)\n    $(CPPFLAGS:%=%\n   )'
-	@echo -e 'CFLAGS (C compiler flags)    \n    $(CFLAGS  :%=%\n   )'
-	@echo -e 'CXXFLAGS (C++ compiler flags)\n    $(CXXFLAGS:%=%\n   )'
-	@echo -e 'LDFLAGS (Linker flags)       \n    $(LDFLAGS :%=%\n   )'
-	@echo -e 'ARFLAGS (Archiver flags)     \n    $(ARFLAGS :%=%\n   )'
+	$(AT)-$(RM) $(BIN)
+	$(AT)-$(RM) $(LIB)
+	$(AT)-$(RM) $(OBJ)
+	$(AT)-$(RM) $(DEP)
+	$(AT)-$(RM) $(VALA_VAPI) $(VALA_C_SRC)
 
 
 run : $(BIN)
@@ -212,34 +156,33 @@ run : $(BIN)
 
 
 # Object files .........................................................
-# compile object files from C sources
-$(OBJ_DIR)/%.c.o : %.c $(DEP_DIR)/%.c.d
+# compile object files from C source files
+$(OBJ_DIR)/%.c.o : %.c $(DEP_DIR)/%.c.dep
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
 	$(AT)$(COMPILE.c) $< -o $@
 
 
-# compile object files from C++ sources
-$(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.d
+# compile object files from C++ source files
+$(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.dep
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
 	$(AT)$(COMPILE.cc) $< -o $@
-
+# COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
 # Dependency files .....................................................
-# generate dependencies from C sources
-$(DEP_DIR)/%.c.d : %.c
+# generate dependencies from C source files
+$(DEP_DIR)/%.c.dep : %.c
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
 	$(AT)$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" "$<"
 
 
-# generate dependencies from C sources
-$(DEP_DIR)/%.cpp.d : %.cpp
+# generate dependencies from C source files
+$(DEP_DIR)/%.cpp.dep : %.cpp
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
 	$(AT)$(CC) $(CPPFLAGS_INC) -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" "$<"
-#	$(AT)$(CC) -I. -std=c++11 -MF"$@" -MG -MM -MT"$@" -MT"$(@:%.cpp.d=%.cpp.o)" "$<"
 
 
 # Vala .................................................................
@@ -277,9 +220,16 @@ $(LIB) : $(OBJ)
 	@echo 'creating $@'
 	$(AR) rcs $@ $^
 
+# $(TARGET) :
+
+
 #=======================================================================
 
+# include generated dependency files
 -include $(DEP)
+
+
+include $(ULTIMAKE_PATH)/ultimake-help.mk
 include $(ULTIMAKE_PATH)/dot.mk
 include $(ULTIMAKE_PATH)/devtools.mk
 # include $(ULTIMAKE_PATH)/gcc-warnings.mk
@@ -288,7 +238,7 @@ include $(ULTIMAKE_PATH)/devtools.mk
 #       because otherwise every included file will be built BEFORE the
 #       target is created COMPLETELY WRONG. Included targets will always
 #       built, even if several intermediate files are neded, for example
-#       .vala -> .vapi,.c -> .d
+#       .vala -> .vapi,.c -> .dep
 # if an included file does not exist but a rule exists, it will be created
 
 
