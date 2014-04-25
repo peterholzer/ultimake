@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.20
-# 12.12.2013
+# Ultimake v1.21
+# 06.01.2014
 
 ifdef ULTIMAKES_SELF_INCLUDE_STOP
     $(error deprecated Target option BIN defined!)
@@ -17,7 +17,7 @@ ifdef LIB
 endif
 
 # Configuration ========================================================
-AT := @
+# AT := @
 
 # remove default suffix rules
 .SUFFIXES :
@@ -51,7 +51,9 @@ VAPI_DIR   ?= .vala/vapi
 # Default Tools ========================================================
 AR    ?= ar
 CC    ?= gcc
+# CC	  := clang
 CXX   ?= g++
+# CXX   := clang++
 VALAC ?= valac
 # CP    ?= cp ...
 MKDIR ?= mkdir -p -v
@@ -63,12 +65,12 @@ RM    ?= rm -f
 # usage;
 #     $(call find,$(1))
 # $(1)  search directory(s)
-find = $(foreach dir,$(1), $(shell find $(dir) -type f))
+find = $(foreach dir,$(1), $(shell find -L $(dir) -type f))
 
 # Create lists of existing files =======================================
 # find all files in working directory
 # but exclude all files in DEP_DIR, OBJ_DIR, VAPI_DIR and VALA_C_DIR
-FILES := $(call find,$(SOURCES))
+FILES := $(call find ,$(SOURCES))
 
 # cut "./" prefix away
 FILES := $(patsubst ./%,%,$(FILES))
@@ -116,6 +118,32 @@ clean :
 
 run : $(BIN)
 	./$(BIN)
+
+
+
+
+# TODO #################################################################
+# TEMP_DEPS := $(C_SRC:%.c=%.c.dep.tmp)
+
+# %.c.dep.tmp: %.c
+# 	$(CC) $(CPPFLAGS_INC) -no-canonical-prefixes -MF"$@" -MG -MM $<
+# 	$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM $<
+
+# graph.mk: $(TEMP_DEPS)
+# 	-rm $@
+# 	cat $(TEMP_DEPS) >> $@
+# 	-rm  $(TEMP_DEPS)
+# 	$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" $(C_SRC) $(CXX_SRC)
+# END TODO #############################################################
+
+# graph.dot : $(C_SRC)
+# 	clang $(CPPFLAGS_INC) $^ -dependency-dot $@
+
+
+
+
+
+
 
 # Rules ################################################################
 
@@ -233,6 +261,9 @@ include $(ULTIMAKE_PATH)/devtools.mk
 
 
 # CHANGELOG ############################################################
+#
+# v1.21
+#     - added -L to find command to find symlinks
 #
 # v1.19
 #     - deleted dead code
