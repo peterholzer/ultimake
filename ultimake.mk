@@ -1,25 +1,16 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.24
-# 2014-05-22
+# Ultimake v1.25
+# 2014-05-23
 
 ifdef ULTIMAKES_SELF_INCLUDE_STOP
     $(error it seems you self-included ultimake.)
 endif
 ULTIMAKES_SELF_INCLUDE_STOP = 1
 
-$(info )
+
 $(info invoking ULTIMAKE)
-$(info )
 
-
-# compatibility check
-ifdef BIN
-    $(error deprecated Target option BIN defined!)
-endif
-ifdef LIB
-    $(error deprecated Target option LIB defined!)
-endif
 
 # Configuration ========================================================
 AT := @
@@ -104,15 +95,11 @@ CXX_SRC  ?= $(filter %.cpp,$(FILES))
 VALA_SRC ?= $(filter %.vala,$(FILES))
 
 # Create lists of generated files ======================================
-# BIN := $(OUT_DIR)/$(TARGET)
-# LIB := $(OUT_DIR)/lib$(TARGET).a
-
+# TODO: $(notdir ... unterordner und so
 LIB := $(filter lib%.a,$(TARGET))
 ifndef LIB
 	BIN := $(TARGET)
 endif
-
-
 
 # create list of vapi files from vala sources
 VALA_VAPI  := $(VALA_SRC:%.vala=$(VAPI_DIR)/%.vapi)
@@ -127,19 +114,13 @@ C_SRC      += $(VALA_C_SRC)
 DEP := $(patsubst %,$(DEP_DIR)/%.dep,$(ASM_SRC) $(C_SRC) $(CXX_SRC))
 OBJ := $(patsubst %,$(OBJ_DIR)/%.o,  $(ASM_SRC) $(C_SRC) $(CXX_SRC))
 
-# PROGRESS_MAX = $(shell echo $(DEP) $(OBJ) $(VALA_C_SRC) $(VALA_VAPI) | wc -w)
 PROGRESS_MAX = $(shell echo $(OBJ) $(VALA_C_SRC) $(VALA_VAPI) | wc -w)
-# PROGRESS_MAX = 0
 PROGRESS = 0
 
 # Targets ##############################################################
 .PHONY : bin clean lib run
 
 all : $(BIN) $(LIB)
-
-bin : $(BIN)
-
-lib : $(LIB)
 
 clean :
 	@echo 'Cleaning ...'
@@ -156,46 +137,17 @@ clean-all :
 	$(AT)-$(shell find $(VALA_C_DIR) -name "*.vala.c" -delete)
 	$(AT)-$(shell find $(VAPI_DIR) -name "*.vapi" -delete)
 
-# 	-$(RM) $(OUT_DIR)/*
-# 	 $(
-# 	$(AT)-$(shell find $(OUT_DIR) -name "*..dep" -delete)
-
-
-
-
 run : $(BIN)
 	./$(BIN)
-
-
-
-
-# TODO #################################################################
-# TEMP_DEPS := $(C_SRC:%.c=%.c.dep.tmp)
-
-# %.c.dep.tmp: %.c
-# 	$(CC) $(CPPFLAGS_INC) -no-canonical-prefixes -MF"$@" -MG -MM $<
-# 	$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM $<
-
-# graph.mk: $(TEMP_DEPS)
-# 	-rm $@
-# 	cat $(TEMP_DEPS) >> $@
-# 	-rm  $(TEMP_DEPS)
-# 	$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" $(C_SRC) $(CXX_SRC)
-# END TODO #############################################################
-
-# graph.dot : $(C_SRC)
-# 	clang $(CPPFLAGS_INC) $^ -dependency-dot $@
-
-
 
 
 # Rules ################################################################
 
 # PROGRESS_MAX = $(shell cat echo $? >>)
 # inc_progress_max = $(eval PROGRESS_MAX := $(shell echo $(PROGRESS_MAX)+1 | bc))
+# add_to_changed_list = $(shell echo $? >> $(DEP_DIR))
 do_progress = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc)) @echo '($(PROGRESS)/$(PROGRESS_MAX)) creating $@'
 make_dir = $(AT)-$(MKDIR) $(@D)
-# add_to_changed_list = $(shell echo $? >> $(DEP_DIR))
 print_creating = @echo 'creating $@'
 
 # Dependency files =====================================================
@@ -291,16 +243,6 @@ include $(ULTIMAKE_PATH)/devtools.mk
 #       otherwise the %-rules wont work
 #       this makes half of the "-not" statements at the creation of the
 #       FILES variable useless
-# TODO: new approach for FILE list creation. instead of giving find the location as parameter, cd to the source directory and call "find ."
-# TODO: try to avoid absolute paths and
-# TODO: do not forget about the leading "./" problem
-# TODO: reintroduce OUT_DIR but this time additionally to DEP_DIR and OBJ_DIR
-# TODO: the dependency files have to be included after all rules,
-#       because otherwise every included file will be built BEFORE the
-#       target is created COMPLETELY WRONG. Included targets will always
-#       built, even if several intermediate files are neded, for example
-#       .vala -> .vapi,.c -> .dep
-# if an included file does not exist but a rule exists, it will be created
 
 # TODO: create shared library from ALL object files
 # $(LIB) : $(OBJ)
@@ -314,6 +256,9 @@ include $(ULTIMAKE_PATH)/devtools.mk
 
 
 # CHANGELOG ############################################################
+#
+# v1.24
+#     - cleaned up
 #
 # v1.23
 #     - ultimake now handles TARGET autmatically as static
