@@ -1,12 +1,17 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.23
+# Ultimake v1.24
 # 2014-05-22
 
 ifdef ULTIMAKES_SELF_INCLUDE_STOP
     $(error it seems you self-included ultimake.)
 endif
 ULTIMAKES_SELF_INCLUDE_STOP = 1
+
+$(info )
+$(info invoking ULTIMAKE)
+$(info )
+
 
 # compatibility check
 ifdef BIN
@@ -17,7 +22,7 @@ ifdef LIB
 endif
 
 # Configuration ========================================================
-# AT := @
+AT := @
 
 # remove default suffix rules
 .SUFFIXES :
@@ -60,16 +65,19 @@ VALA_C_DIR ?= debug
 VAPI_DIR   ?= debug
 
 # Default Tools ========================================================
-AR    ?= ar
-CC    ?= gcc
-# CC	  := clang
-CXX   ?= g++
-# CXX   := clang++
-VALAC ?= valac
+AR      ?= ar
+CC      ?= gcc
+CXX     ?= g++
+VALAC   ?= valac
+MKDIR   ?= mkdir -p -v
+MV      ?= mv -f
+RM      ?= rm -f
+
+# ARFLAGS ?= r
 # CP    ?= cp ...
-MKDIR := mkdir -p -v
-MV    ?= mv -f
-RM    ?= rm -f
+# CC      := clang
+# CXX   := clang++
+
 
 # Functions ============================================================
 # "find" executes "find -type f" in several directories and cuts "./" prefix away
@@ -77,6 +85,8 @@ RM    ?= rm -f
 #     $(call find,$(1))
 # $(1)  search directory(s)
 find = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -type f)))
+
+
 
 # Create lists of existing files =======================================
 # find all files in working directory
@@ -116,6 +126,11 @@ C_SRC      += $(VALA_C_SRC)
 # and handle folder prefix and file extension
 DEP := $(patsubst %,$(DEP_DIR)/%.dep,$(ASM_SRC) $(C_SRC) $(CXX_SRC))
 OBJ := $(patsubst %,$(OBJ_DIR)/%.o,  $(ASM_SRC) $(C_SRC) $(CXX_SRC))
+
+# PROGRESS_MAX = $(shell echo $(DEP) $(OBJ) $(VALA_C_SRC) $(VALA_VAPI) | wc -w)
+PROGRESS_MAX = $(shell echo $(OBJ) $(VALA_C_SRC) $(VALA_VAPI) | wc -w)
+# PROGRESS_MAX = 0
+PROGRESS = 0
 
 # Targets ##############################################################
 .PHONY : bin clean lib run
@@ -174,61 +189,66 @@ run : $(BIN)
 
 
 
-
-
-
 # Rules ################################################################
+
+# PROGRESS_MAX = $(shell cat echo $? >>)
+# inc_progress_max = $(eval PROGRESS_MAX := $(shell echo $(PROGRESS_MAX)+1 | bc))
+do_progress = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc)) @echo '($(PROGRESS)/$(PROGRESS_MAX)) creating $@'
+make_dir = $(AT)-$(MKDIR) $(@D)
+# add_to_changed_list = $(shell echo $? >> $(DEP_DIR))
+print_creating = @echo 'creating $@'
 
 # Dependency files =====================================================
 # generate dependency files from assembler source files
 $(DEP_DIR)/%.S.dep : %.S
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(print_creating)
 	$(AT)$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.S=%.S.o)" $<
 
 # generate dependency files from C source files
 $(DEP_DIR)/%.c.dep : %.c
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(print_creating)
 	$(AT)$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" $<
 
 # generate dependency files from C source files
 $(DEP_DIR)/%.cpp.dep : %.cpp
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(print_creating)
 	$(AT)$(CC) $(CPPFLAGS_INC) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" $<
 
 # Object files  ========================================================
 # compile object files from assembler source files
 $(OBJ_DIR)/%.S.o : %.S $(DEP_DIR)/%.S.dep
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(do_progress)
 	$(AT)$(COMPILE.S) $< -o $@
 
 # compile object files from C source files
 $(OBJ_DIR)/%.c.o : %.c $(DEP_DIR)/%.c.dep
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(do_progress)
 	$(AT)$(COMPILE.c) $< -o $@
 
 # compile object files from C++ source files
 $(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.dep
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(do_progress)
 	$(AT)$(COMPILE.cc) $< -o $@
 # COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
 # Assembler files ======================================================
 # create assembler files from C source files
 %.s : %.c
+	$(print_creating)
 	$(AT)$(CC) $(CPPFLAGS) $(CFLAGS) -C -S $< -o $@
-	@echo 'creating $@'
+
 
 # Vala =================================================================
 # generate C code from Vala
 $(VALA_C_DIR)/%.vala.c : %.vala $(VALA_VAPI)
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(do_progress)
+	$(make_dir)
 	$(AT)$(VALAC) $(VALAFLAGS) --ccode $< \
 		$(foreach vapi,$(filter-out $(VAPI_DIR)/$*.vapi,$(VALA_VAPI)),--use-fast-vapi=$(vapi))
 #	$(AT)$(VALAC) $(VALAFLAGS) --ccode $(VALA_SRC) $(foreach vapi,$(VALA_VAPI),--use-fast-vapi=$(VAPI_DIR)/$(vapi))
@@ -236,25 +256,26 @@ $(VALA_C_DIR)/%.vala.c : %.vala $(VALA_VAPI)
 
 # create vapi from Vala
 $(VAPI_DIR)/%.vapi : %.vala
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
+	$(make_dir)
+	$(do_progress)
 	$(AT)$(VALAC) $< --fast-vapi=$@
 
 # Linking ==============================================================
 # link ALL object files into binary
 $(BIN) : $(OBJ)
-	$(AT)$(MKDIR) $(@D)
+	$(make_dir)
 	@echo 'linking  $@'
 	$(AT)$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 # Archiving ============================================================
 # create static library from ALL object files
 $(LIB) : $(OBJ)
-	$(AT)$(MKDIR) $(@D)
+	$(make_dir)
 	@echo 'removing $@'
 	$(AT)$(RM) $@
 	@echo 'creating $@'
-	$(AR) $(ARFLAGS) $@ $^
+	$(AR) r $@ $^
+# 	$(AR) $(ARFLAGS) $@ $^
 
 ########################################################################
 # include generated dependency files
