@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.21
-# 06.01.2014
+# Ultimake v1.22
+# 25.04.2014
 
 ifdef ULTIMAKES_SELF_INCLUDE_STOP
     $(error deprecated Target option BIN defined!)
@@ -45,6 +45,7 @@ SOURCES    ?= .
 OUT_DIR    ?= debug
 DEP_DIR    ?= .dep
 OBJ_DIR    ?= .obj
+PCH_DIR	   ?= .pch
 VALA_C_DIR ?= .vala/c
 VAPI_DIR   ?= .vala/vapi
 
@@ -146,6 +147,11 @@ run : $(BIN)
 
 
 # Rules ################################################################
+
+$(PCH_DIR)/%.hpp.gch : %.hpp
+	$(AT)$(MKDIR) $(@D)
+	@echo 'creating $@'
+	$(AT)$(COMPILE.cc) $< -o $@
 
 # Dependency files =====================================================
 # generate dependency files from assembler source files
@@ -261,6 +267,9 @@ include $(ULTIMAKE_PATH)/devtools.mk
 
 
 # CHANGELOG ############################################################
+#
+# v1.22
+#     - partially added precompiled headers
 #
 # v1.21
 #     - added -L to find command to find symlinks
