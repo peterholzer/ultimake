@@ -1,10 +1,10 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.22
-# 25.04.2014
+# Ultimake v1.23
+# 2014-05-22
 
 ifdef ULTIMAKES_SELF_INCLUDE_STOP
-    $(error deprecated Target option BIN defined!)
+    $(error it seems you self-included ultimake.)
 endif
 ULTIMAKES_SELF_INCLUDE_STOP = 1
 
@@ -32,22 +32,32 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # Default Target  ======================================================
-TARGET     ?= a.out
+ifndef TARGET
+    TARGET := a.out
+    $(info TARGET not defined. Using default value $(TARGET))
+endif
+
 
 # Default Directories ==================================================
 # default values for include file search directories
 # (will automatically convert to "gcc -I<DIRECTORY>)
-INCLUDES   ?= .
+ifndef INCLUDES
+    INCLUDES := .
+    $(info INCLUDES not defined. Using default value $(INCLUDES))
+endif
 # default values for source file search directories
-SOURCES    ?= .
+ifndef SOURCES
+    SOURCES := .
+    $(info SOURCES not defined. Using default value $(SOURCES))
+endif
+
 
 # default values for generated directories
 OUT_DIR    ?= debug
-DEP_DIR    ?= .dep
-OBJ_DIR    ?= .obj
-PCH_DIR	   ?= .pch
-VALA_C_DIR ?= .vala/c
-VAPI_DIR   ?= .vala/vapi
+DEP_DIR    ?= debug
+OBJ_DIR    ?= debug
+VALA_C_DIR ?= debug
+VAPI_DIR   ?= debug
 
 # Default Tools ========================================================
 AR    ?= ar
@@ -57,44 +67,49 @@ CXX   ?= g++
 # CXX   := clang++
 VALAC ?= valac
 # CP    ?= cp ...
-MKDIR ?= mkdir -p -v
+MKDIR := mkdir -p -v
 MV    ?= mv -f
 RM    ?= rm -f
 
 # Functions ============================================================
-# "find" executes "find -type f" in several directories
+# "find" executes "find -type f" in several directories and cuts "./" prefix away
 # usage;
 #     $(call find,$(1))
 # $(1)  search directory(s)
-find = $(foreach dir,$(1), $(shell find -L $(dir) -type f))
+find = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -type f)))
 
 # Create lists of existing files =======================================
 # find all files in working directory
-# but exclude all files in DEP_DIR, OBJ_DIR, VAPI_DIR and VALA_C_DIR
+# should we exclude all files in DEP_DIR, OBJ_DIR, VAPI_DIR and VALA_C_DIR ?
 FILES := $(call find ,$(SOURCES))
 
-# cut "./" prefix away
-FILES := $(patsubst ./%,%,$(FILES))
 
 CPPFLAGS_INC := $(foreach include,$(INCLUDES),-I$(include))
 CPPFLAGS     += $(CPPFLAGS_INC)
 
-# filter C/C++/Vala sources
+# filter Assembler/C/C++/Vala sources
 ASM_SRC  ?= $(filter %.S,$(FILES))
 C_SRC    ?= $(filter %.c,$(FILES))
 CXX_SRC  ?= $(filter %.cpp,$(FILES))
 VALA_SRC ?= $(filter %.vala,$(FILES))
 
 # Create lists of generated files ======================================
-BIN := $(OUT_DIR)/$(TARGET)
-LIB := $(OUT_DIR)/lib$(TARGET).a
+# BIN := $(OUT_DIR)/$(TARGET)
+# LIB := $(OUT_DIR)/lib$(TARGET).a
+
+LIB := $(filter lib%.a,$(TARGET))
+ifndef LIB
+	BIN := $(TARGET)
+endif
+
+
 
 # create list of vapi files from vala sources
 VALA_VAPI  := $(VALA_SRC:%.vala=$(VAPI_DIR)/%.vapi)
 
 # create list of vala-generated C source files from vala sources
 # and add it to the list of C source files
-VALA_C_SRC := $(VALA_SRC:%.vala=$(VALA_C_DIR)/%.c)
+VALA_C_SRC := $(VALA_SRC:%.vala=$(VALA_C_DIR)/%.vala.c)
 C_SRC      += $(VALA_C_SRC)
 
 # create list of dependency and object files from sources
@@ -103,9 +118,11 @@ DEP := $(patsubst %,$(DEP_DIR)/%.dep,$(ASM_SRC) $(C_SRC) $(CXX_SRC))
 OBJ := $(patsubst %,$(OBJ_DIR)/%.o,  $(ASM_SRC) $(C_SRC) $(CXX_SRC))
 
 # Targets ##############################################################
-.PHONY : all clean lib run
+.PHONY : bin clean lib run
 
-all : $(BIN)
+all : $(BIN) $(LIB)
+
+bin : $(BIN)
 
 lib : $(LIB)
 
@@ -116,6 +133,20 @@ clean :
 	$(AT)-$(RM) $(OBJ)
 	$(AT)-$(RM) $(DEP)
 	$(AT)-$(RM) $(VALA_VAPI) $(VALA_C_SRC)
+
+clean-all :
+	@echo 'Cleaning, really ...'
+	$(AT)-$(shell find $(DEP_DIR) -name "*.dep" -delete)
+	$(AT)-$(shell find $(OBJ_DIR) -name "*.o" -delete)
+	$(AT)-$(shell find $(VALA_C_DIR) -name "*.vala.c" -delete)
+	$(AT)-$(shell find $(VAPI_DIR) -name "*.vapi" -delete)
+
+# 	-$(RM) $(OUT_DIR)/*
+# 	 $(
+# 	$(AT)-$(shell find $(OUT_DIR) -name "*..dep" -delete)
+
+
+
 
 run : $(BIN)
 	./$(BIN)
@@ -147,11 +178,6 @@ run : $(BIN)
 
 
 # Rules ################################################################
-
-$(PCH_DIR)/%.hpp.gch : %.hpp
-	$(AT)$(MKDIR) $(@D)
-	@echo 'creating $@'
-	$(AT)$(COMPILE.cc) $< -o $@
 
 # Dependency files =====================================================
 # generate dependency files from assembler source files
@@ -200,7 +226,7 @@ $(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.dep
 
 # Vala =================================================================
 # generate C code from Vala
-$(VALA_C_DIR)/%.c : %.vala $(VALA_VAPI)
+$(VALA_C_DIR)/%.vala.c : %.vala $(VALA_VAPI)
 	$(AT)$(MKDIR) $(@D)
 	@echo 'creating $@'
 	$(AT)$(VALAC) $(VALAFLAGS) --ccode $< \
@@ -267,6 +293,11 @@ include $(ULTIMAKE_PATH)/devtools.mk
 
 
 # CHANGELOG ############################################################
+#
+# v1.23
+#     - ultimake now handles TARGET autmatically as static
+#       library when it is named lib*.a
+#   ( - removed precompiled headers )
 #
 # v1.22
 #     - partially added precompiled headers
