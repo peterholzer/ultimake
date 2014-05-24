@@ -1,50 +1,29 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.26
+# Ultimake v1.27
 # 2014-05-24
 
 # TODO:  CFLAGS := -.../x/y
 # TODO:  CFLAGS := -isystem ../x/y keine Warnings für Systembibliotheken
 
 
-# 	$(shell echo blablabla)
-
 
 # http://stackoverflow.com/questions/2738292/how-to-deal-with-recursive-dependencies-between-static-libraries-using-the-binut
-# While @nos provides a simple solution, it doesn't scale when there are multiple libraries involved and the mutual dependencies are more complex. To sort out the problems ld provides --start-group archives --end-group.
+# While @nos provides a simple solution, it doesn't scale when there are multiple libraries involved and the mutual dependencies
+# are more complex. To sort out the problems ld provides --start-group archives --end-group.
 # In your particular case:
 # g++ test_obj.o --start-group -lA -lB --end-group -o test
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-$(info )
-$(info invoking ULTIMAKE in $(CURDIR))
+# $(info )
+# $(info INVOKING ULTIMAKE in $(CURDIR) =======================)
 
 
 ifdef ULTIMAKE_NAME
     $(error it seems you self-included ultimake.)
 endif
-
-
-
-# CLR_GREEN := \033[1;32m
-ifdef TERM
-	CLR_GREEN := $(shell tput setaf 2)$(shell tput bold)
-	CLR_NONE  := $(shell tput sgr0)
-endif
-# CLR_NONE  := \033[0m
-
 
 
 
@@ -141,10 +120,29 @@ endif
 DEP := $(patsubst %,$(DEP_DIR)/%.dep,$(ASM_SRC) $(C_SRC) $(CXX_SRC))
 OBJ := $(patsubst %,$(OBJ_DIR)/%.o,  $(ASM_SRC) $(C_SRC) $(CXX_SRC))
 
-PROGRESS_MAX = $(shell echo $(OBJ) | wc -w)
-PROGRESS = 0
+# Fancy colored progress printing ======================================
+ifdef TERM
+	CLR_DARK_GREEN  := $(shell tput setaf 2)
+	CLR_LIGHT_GREEN := $(shell tput setaf 2)$(shell tput bold)
+	CLR_LIGHT_RED   := $(shell tput setaf 1)$(shell tput bold)
+	CLR_LIGHT_PINK  := $(shell tput setaf 5)$(shell tput bold)
+	CLR_NONE  := $(shell tput sgr0)
+endif
+# NUM_ALL = $(shell echo $(OBJ) | wc -w)
+NUM_ALL = $(words $(OBJ))
+NUM_DEP = 0
+NUM_OBJ = 0
+count_dep = $(eval NUM_DEP := $(shell echo $(NUM_DEP)+1 | bc)) \
+    @echo -e -n '\r$(CLR_LIGHT_PINK)Scanning dependencies$(CLR_NONE) [$(NUM_DEP)/$(NUM_ALL)]'
+#     @echo -e -n '\r    $(CLR_LIGHT_GREEN)$(NUM_DEP)\tobjects to build$(CLR_NONE)'
+count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc)) \
+    @echo '[$(patsubst ?,x%,$(NUM_OBJ))] $(CLR_DARK_GREEN)Building ASM/C/C++ object $@$(CLR_NONE)'
+#     @echo '[$(NUM_OBJ)] $(CLR_DARK_GREEN)creating $@$(CLR_NONE)'
 
-# Targets ##############################################################
+
+
+# Phony Targets ########################################################
+
 .PHONY : bin clean lib run
 
 all : $(BIN) $(LIB)
@@ -167,49 +165,55 @@ run : $(BIN)
 
 # Rules ################################################################
 
-do_progress = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc)) @echo '($(PROGRESS)/$(PROGRESS_MAX)) creating $@'
+
+# NUM_OBJ_MAX = $(shell echo $(OBJ) | wc -w)
+#   @echo '($(NUM_OBJ)/$(NUM_OBJ_MAX)) $(CLR_DARK_GREEN)creating $@$(CLR_NONE)'
 # make_dir = $(AT)-$(MKDIR) $(@D)
-make_dir = $(AT)-$(MKDIR) $(@D)
 # print_creating = @echo 'creating $@'
-print_bar = @echo -n =
+# print_bar = @echo -n =
+
+make_dir = $(AT)-$(MKDIR) $(@D)
+
 
 # Dependency files =====================================================
 # generate dependency files from assembler source files
 $(DEP_DIR)/%.S.dep : %.S
 	$(make_dir)
-	$(print_bar)
+	$(count_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.S=%.S.o)" $<
 
 # generate dependency files from C source files
 $(DEP_DIR)/%.c.dep : %.c
 	$(make_dir)
-	$(print_bar)
+	$(count_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" $<
 
 # generate dependency files from C source files
 $(DEP_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
-	$(print_bar)
+	$(count_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" $<
+
+silent := 2> /dev/null
 
 # Object files  ========================================================
 # compile object files from assembler source files
 $(OBJ_DIR)/%.S.o : %.S $(DEP_DIR)/%.S.dep
 	$(make_dir)
-	$(do_progress)
-	$(AT)$(COMPILE.S) $< -o $@
+	$(count_obj)
+	$(AT)$(COMPILE.S) $< -o $@ $(silent)
 
 # compile object files from C source files
 $(OBJ_DIR)/%.c.o : %.c $(DEP_DIR)/%.c.dep
 	$(make_dir)
-	$(do_progress)
-	$(AT)$(COMPILE.c) $< -o $@
+	$(count_obj)
+	$(AT)$(COMPILE.c) $< -o $@ $(silent)
 
 # compile object files from C++ source files
 $(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.dep
 	$(make_dir)
-	$(do_progress)
-	$(AT)$(COMPILE.cc) $< -o $@
+	$(count_obj)
+	$(AT)$(COMPILE.cc) $< -o $@ $(silent)
 # COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
 # Assembler files ======================================================
@@ -222,7 +226,7 @@ $(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.dep
 # link ALL object files into binary
 $(BIN) : $(OBJ)
 	$(make_dir)
-	@echo -e '$(CLR_GREEN)linking $@$(CLR_NONE)'
+	@echo -e '$(CLR_LIGHT_RED)Linking CXX executable $@$(CLR_NONE)'
 	$(AT)$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 # Archiving ============================================================
@@ -231,7 +235,7 @@ $(LIB) : $(OBJ)
 	$(make_dir)
 	@echo 'removing $@'
 	$(AT)$(RM) $@
-	@echo -e '$(CLR_GREEN)creating $@$(CLR_NONE)'
+	@echo -e '$(CLR_LIGHT_RED)Linking C/CXX static library $@$(CLR_NONE)'
 # 	@echo 'creating $@'
 	$(AT)$(AR) rs $@ $^
 # 	$(AT)$(AR) $(ARFLAGS) $@ $^
@@ -239,6 +243,8 @@ $(LIB) : $(OBJ)
 ########################################################################
 # include generated dependency files
 -include $(DEP)
+$(info )
+
 # include $(ULTIMAKE_PATH)/ultimake-help.mk
 # include $(ULTIMAKE_PATH)/dot.mk
 # include $(ULTIMAKE_PATH)/devtools.mk
