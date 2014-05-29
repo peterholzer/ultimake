@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.28
-# 2014-05-28
+# Ultimake v1.29
+# 2014-05-29
 
 # TODO:  CFLAGS := -.../x/y
 # TODO:  CFLAGS := -isystem ../x/y keine Warnings für Systembibliotheken
@@ -25,9 +25,10 @@ ifdef ULTIMAKE_NAME
     $(error it seems you self-included ultimake.)
 endif
 
+# CC := sleep 0.$$RANDOM; gcc
 
 # Configuration ========================================================
-ifndef ULTIMAKE_DEBUG
+ifndef VERBOSE
 	AT := @
 endif
 
@@ -44,17 +45,16 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # default values for generated directories
-# OUT_DIR ?= debug
-DEP_DIR ?= debug
-OBJ_DIR ?= debug
+OUT_DIR ?= debug
+
 
 # Default Tools ========================================================
 AR    ?= ar
 CC    ?= gcc
 CXX   ?= g++
 MKDIR ?= mkdir -p -v
-MV    ?= mv -f
 RM    ?= rm -f
+# MV    ?= mv -f
 # ARFLAGS ?= r
 
 # Default Target  ======================================================
@@ -65,13 +65,17 @@ endif
 
 
 # Default Directories ==================================================
-# default values for include file search directories
+
+
+# deprecated: default values for include file search directories
 # (will automatically convert to "gcc -I<DIRECTORY>)
-ifndef INCLUDES
-    INCLUDES := .
-    $(info INCLUDES not defined. Using default value $(INCLUDES))
-endif
-CPPFLAGS += $(foreach inc,$(INCLUDES),-I$(inc))
+#ifdef INCLUDES
+#    $(info )$(info INCLUDES is deprecated)
+#    $(info alternative 1: CPPFLAGS += -I<include-path>)
+#    $(info alternative 2: CPPFLAGS += $$(foreach inc,$$(INCLUDES),-I$$(inc)))
+#    $(info )$(error )
+#endif
+
 
 # default values for source file search directories
 ifndef SOURCES
@@ -84,7 +88,7 @@ endif
 
 # Create lists of existing files =======================================
 # find all files in working directory
-# should we exclude all files in DEP_DIR, OBJ_DIR ?
+# should we exclude all files in OUT_DIR, OUT_DIR ?
 # executes "find -type f" in several directories and cuts "./" prefix away
 ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
 
@@ -100,8 +104,8 @@ endif
 
 # create list of dependency and object files from sources
 # and handle folder prefix and file extension
-DEP := $(patsubst %,$(DEP_DIR)/%.dep,$(SOURCE_FILES))
-OBJ := $(patsubst %,$(OBJ_DIR)/%.o,  $(SOURCE_FILES))
+DEP := $(patsubst %,$(OUT_DIR)/%.dep,$(SOURCE_FILES))
+OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $(SOURCE_FILES))
 
 
 # Fancy colored progress printing ======================================
@@ -112,15 +116,30 @@ ifdef TERM
 	CLR_NONE  := $(shell tput sgr0)
 endif
 
-NUM_DEP_FILE=.ultimake-rebuild-count
+NUM_DEP_FILE=$(OUT_DIR)/.ultimake-rebuild-count
 NUM_DEP = 0
 NUM_OBJ = 0
 NUM_OBJ_ALL = $(shell cat $(NUM_DEP_FILE))
 count_dep = $(eval NUM_DEP := $(shell echo $(NUM_DEP)+1 | bc)) \
     @echo -n $(NUM_DEP) > $(NUM_DEP_FILE); printf '\r[$(NUM_DEP)/$(words $(OBJ))] $(CLR_PINK)Scanning dependencies$(CLR_NONE)';
-count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc))
 
-calc_percent = $(shell echo $(NUM_OBJ)00/$(NUM_OBJ_ALL) | bc)
+count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc))
+# calc_percent = $(shell echo $(NUM_OBJ)00/$(NUM_OBJ_ALL) | bc)
+
+#
+# print_obj = @printf '[%3d%%] $(CLR_GREEN)$1$(CLR_NONE)\n' '$(calc_percent)'
+
+# calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
+percentage = $(shell echo $(1)00/$(2) | bc)
+print_obj = @printf '[%3d%%] $(CLR_GREEN)$1$(CLR_NONE)\n' '$(call percentage,$(NUM_OBJ),$(NUM_OBJ_ALL))'
+
+
+
+make_dir = $(AT)-$(MKDIR) $(@D)
+
+# CPPFLAGS_DEP :=
+
+
 
 # count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc)) \
 #     @printf '[%2d/$(NUM_OBJ_ALL)] $(CLR_GREEN)'
@@ -154,8 +173,8 @@ clean :
 
 clean-all :
 	@echo 'Cleaning, really ...'
-	$(AT)-$(shell find $(DEP_DIR) -name "*.dep" -delete)
-	$(AT)-$(shell find $(OBJ_DIR) -name "*.o" -delete)
+	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -delete)
+	$(AT)-$(shell find $(OUT_DIR) -name "*.o" -delete)
 
 run : $(BIN)
 	./$(BIN)
@@ -163,50 +182,47 @@ run : $(BIN)
 
 # Rules ################################################################
 
-make_dir = $(AT)-$(MKDIR) $(@D)
-
-# CPPFLAGS_DEP :=
 
 # Dependency files =====================================================
 # generate dependency files from assembler source files
-$(DEP_DIR)/%.S.dep : %.S
+$(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$(count_dep)
-	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.S=%.S.o)" $<
+	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
 
 # generate dependency files from C source files
-$(DEP_DIR)/%.c.dep : %.c
+$(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
 	$(count_dep)
-	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.c=%.c.o)" $<
+	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $<
 
 # generate dependency files from C++ source files
-$(DEP_DIR)/%.cpp.dep : %.cpp
+$(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
 	$(count_dep)
-	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OBJ_DIR)/$(<:%.cpp=%.cpp.o)" $<
+	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $<
 
 
 # Object files  ========================================================
 # compile object files from assembler source files
-$(OBJ_DIR)/%.S.o : %.S $(DEP_DIR)/%.S.dep
+$(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$(make_dir)
 	$(count_obj)
-	@printf '[%3d%%] $(CLR_GREEN)Building ASM object $@$(CLR_NONE)\n' '$(calc_percent)'
+	$(call print_obj,Building ASM object $@)
 	$(AT)$(COMPILE.S) $< -o $@
 
 # compile object files from C source files
-$(OBJ_DIR)/%.c.o : %.c $(DEP_DIR)/%.c.dep
+$(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$(make_dir)
 	$(count_obj)
-	@printf '[%3d%%] $(CLR_GREEN)Building C object $@$(CLR_NONE)\n' '$(calc_percent)'
+	$(call print_obj,Building C object $@)
 	$(AT)$(COMPILE.c) $< -o $@
 
 # compile object files from C++ source files
-$(OBJ_DIR)/%.cpp.o : %.cpp $(DEP_DIR)/%.cpp.dep
+$(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$(make_dir)
 	$(count_obj)
-	@printf '[%3d%%] $(CLR_GREEN)Building C object $@$(CLR_NONE)\n' '$(calc_percent)'
+	$(call print_obj,Building C++ object $@)
 	$(AT)$(COMPILE.cc) $< -o $@
 # COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
@@ -234,8 +250,14 @@ $(LIB) : $(OBJ)
 
 ########################################################################
 # include generated dependency files
--include $(DEP)
-$(info )
+# MAKECMDGOALS = invoked target
+# in a less crazy language i would write "if MAKECMDGOALS!=clean && MAKECMDGOALS!=clean-all"
+ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
+    -include $(DEP)
+endif
+
+
+$(info  )
 
 # include $(ULTIMAKE_PATH)/ultimake-help.mk
 # include $(ULTIMAKE_PATH)/dot.mk
@@ -259,6 +281,11 @@ $(info )
 
 
 # CHANGELOG ############################################################
+#
+# v1.29
+#     - fixed unwanted rebuilding of dependencies when target 'clean' is called repeatedly,
+#       found solition in GNU make manual 9.2 ;-)
+#     - renamed DEBUG variable to VERBOSE
 #
 # v1.28
 #     - introduced progress percentage
