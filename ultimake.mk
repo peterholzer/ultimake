@@ -1,7 +1,9 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.29
-# 2014-05-29
+# Ultimake v1.30
+# 2014-05-30
+
+# TODO: create static libs directly in main-makefile with ultimake? see http://www.gnu.org/software/make/manual/make.html#Secondary-Expansion
 
 # TODO:  CFLAGS := -.../x/y
 # TODO:  CFLAGS := -isystem ../x/y keine Warnings für Systembibliotheken
@@ -17,7 +19,7 @@
 # In your particular case:
 # g++ test_obj.o --start-group -lA -lB --end-group -o test
 
-# $(info )
+$(info )
 # $(info ULTIMAKE $(CURDIR))
 # $(info ultimake (c) 2014 Peter Holzer)
 
@@ -29,7 +31,7 @@ endif
 
 # Configuration ========================================================
 ifndef VERBOSE
-	AT := @
+    AT := @
 endif
 
 # remove default suffix rules
@@ -54,7 +56,7 @@ CC    ?= gcc
 CXX   ?= g++
 MKDIR ?= mkdir -p -v
 RM    ?= rm -f
-# MV    ?= mv -f
+MV    ?= mv -f
 # ARFLAGS ?= r
 
 # Default Target  ======================================================
@@ -109,54 +111,83 @@ OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $(SOURCE_FILES))
 
 
 # Fancy colored progress printing ======================================
-ifdef TERM
-	CLR_GREEN := $(shell tput setaf 2)
-	CLR_RED   := $(shell tput setaf 1)$(shell tput bold)
-	CLR_PINK  := $(shell tput setaf 5)$(shell tput bold)
-	CLR_NONE  := $(shell tput sgr0)
+ifndef ULTIMAKE_NOCOLOR
+    ifdef TERM
+#         COLOR_BUILD := $(shell tput setaf 2)
+#         COLOR_LINK  := $(shell tput setaf 1)$(shell tput bold)
+#         COLOR_DEP   := $(shell tput setaf 5)$(shell tput bold)
+#         COLOR_GEN   := $(shell tput setaf 4)$(shell tput bold)
+#         COLOR_WARN  := $(shell tput setaf 1)
+#         COLOR_NOTE  := $(shell tput setaf 3)
+#         COLOR_ERR   := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
+#         COLOR_NONE  := $(shell tput sgr0)
+
+        TERM_GREEN := $(shell tput setaf 2)
+        TERM_RED   := $(shell tput setaf 1)$(shell tput bold)
+        TERM_BLUE  := $(shell tput setaf 4)$(shell tput bold)
+        TERM_PINK  := $(shell tput setaf 5)$(shell tput bold)
+        TERM_NONE  := $(shell tput sgr0)
+        TERM_CURSOR_UP := $(shell tput cuu1)
+
+        GCC_COLOR_ERR := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
+        GCC_COLOR_WARN := $(shell tput setaf 1)
+        GCC_COLOR_NOTE := $(shell tput setaf 3)
+
+        GCC_COLOR :=  2>&1 1>/dev/null \
+         | sed -r 's/(.*error:.*)/$(GCC_COLOR_ERR)\1$(TERM_NONE)/;\
+                   s/(.*warning:)/$(GCC_COLOR_WARN)\1$(TERM_NONE)/;\
+                   s/(.*note:)/$(GCC_COLOR_NOTE)\1$(TERM_NONE)/' >&2
+
+#         SHELL := bash
+#         GCC_COLOR := 2> >(sed -r 's///' >&2)
+    endif
 endif
 
-NUM_DEP_FILE=$(OUT_DIR)/.ultimake-rebuild-count
-NUM_DEP = 0
-NUM_OBJ = 0
-NUM_OBJ_ALL = $(shell cat $(NUM_DEP_FILE))
-count_dep = $(eval NUM_DEP := $(shell echo $(NUM_DEP)+1 | bc)) \
-    @echo -n $(NUM_DEP) > $(NUM_DEP_FILE); printf '\r[$(NUM_DEP)/$(words $(OBJ))] $(CLR_PINK)Scanning dependencies$(CLR_NONE)';
+ifndef ULTIMAKE_NOPROGRESS
+    NUM_DEP_FILE=$(OUT_DIR)/.ultimake-rebuild-count
+    NUM_DEP = 0
+    NUM_OBJ = 0
+    NUM_OBJ_ALL = $(shell cat $(NUM_DEP_FILE))
+    count_dep = $(eval NUM_DEP := $(shell echo $(NUM_DEP)+1 | bc)) \
+        @echo -n $(NUM_DEP) > $(NUM_DEP_FILE); \
+        printf '$(TERM_CURSOR_UP)$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE) [$(NUM_DEP)/$(words $(OBJ))]\n';
+    #     @echo -n $(NUM_DEP) > $(NUM_DEP_FILE); printf '\r[$(NUM_DEP)/$(words $(OBJ))] $(TERM_PINK)Scanning dependencies$(TERM_NONE)';
 
-count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc))
-# calc_percent = $(shell echo $(NUM_OBJ)00/$(NUM_OBJ_ALL) | bc)
+    count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc))
 
-#
-# print_obj = @printf '[%3d%%] $(CLR_GREEN)$1$(CLR_NONE)\n' '$(calc_percent)'
-
-# calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
-percentage = $(shell echo $(1)00/$(2) | bc)
-print_obj = @printf '[%3d%%] $(CLR_GREEN)$1$(CLR_NONE)\n' '$(call percentage,$(NUM_OBJ),$(NUM_OBJ_ALL))'
-
-
+    # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
+    percentage = $(shell echo $(1)00/$(2) | bc)
+    print_obj = @printf '[%3d%%] $(TERM_GREEN)$1$(TERM_NONE)\n' '$(call percentage,$(NUM_OBJ),$(NUM_OBJ_ALL))'
+else
+    print_obj = @printf '$(TERM_GREEN)$1$(TERM_NONE)\n'
+endif
 
 make_dir = $(AT)-$(MKDIR) $(@D)
-
-# CPPFLAGS_DEP :=
-
-
-
-# count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc)) \
-#     @printf '[%2d/$(NUM_OBJ_ALL)] $(CLR_GREEN)'
-
-
-#     @printf '[%2d/$(NUM_OBJ_ALL)] $(shell echo $(NUM_OBJ)00/$(NUM_OBJ_ALL) | bc)%% $(CLR_GREEN)'
-# $(shell echo $(NUM_OBJ)00/$(NUM_OBJ_ALL) | bc)
 
 
 # Phony Targets ########################################################
 
 .PHONY : clean run clean-all
-.PHONY :  submake
 
 all : $(BIN) $(LIB)
 
+clean :
+	@echo 'Cleaning ...'
+	$(AT)-$(RM) $(BIN) $(LIB) $(OBJ) $(DEP)
+
+clean-all :
+	@echo 'Cleaning, really ...'
+	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -o -name "*.o" -delete)
+
+run : $(BIN)
+	./$(BIN)
+
+# 	@for dir in $(SUB_MAKES); do    \
+# 		$(MAKE) -C $$dir $(MAKECMDGOALS);     \
+# 	done
+
 # $(BIN) $(LIB) : | submake
+# .PHONY :  submake
 
 # submake :
 # 	@echo 'submake: Making $@'
@@ -164,20 +195,28 @@ all : $(BIN) $(LIB)
 # 		$(MAKE) -C $$dir;       \
 # 	done
 
-clean :
-	@echo 'Cleaning ...'
-	$(AT)-$(RM) $(BIN) $(LIB) $(OBJ) $(DEP)
-# 	@for dir in $(SUB_MAKES); do    \
-# 		$(MAKE) -C $$dir clean;     \
-# 	done
 
-clean-all :
-	@echo 'Cleaning, really ...'
-	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -delete)
-	$(AT)-$(shell find $(OUT_DIR) -name "*.o" -delete)
+# Submake ##############################################################
 
-run : $(BIN)
-	./$(BIN)
+LDFLAGS += -L$(dir $(LIB_FILES))
+LDFLAGS += -l$(patsubst lib%.a,%, $(notdir $(LIB_FILES)))
+
+.PHONY : submake
+
+$(BIN) $(LIB) all clean : | submake
+
+submake :
+	@for dir in $(SUB_MAKES); do          \
+		$(MAKE) -C $$dir $(MAKECMDGOALS); \
+	done
+
+$(TARGET) : $(LIB_FILES) | submake
+
+$(LIB_FILES) : submake
+
+
+
+
 
 
 # Rules ################################################################
@@ -209,43 +248,43 @@ $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$(make_dir)
 	$(count_obj)
 	$(call print_obj,Building ASM object $@)
-	$(AT)$(COMPILE.S) $< -o $@
+	$(AT)$(COMPILE.S) $< -o $@ $(GCC_COLOR)
 
 # compile object files from C source files
 $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$(make_dir)
 	$(count_obj)
 	$(call print_obj,Building C object $@)
-	$(AT)$(COMPILE.c) $< -o $@
+	$(AT)$(COMPILE.c) $< -o $@ $(GCC_COLOR)
 
 # compile object files from C++ source files
 $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$(make_dir)
 	$(count_obj)
 	$(call print_obj,Building C++ object $@)
-	$(AT)$(COMPILE.cc) $< -o $@
+	$(AT)$(COMPILE.cc) $< -o $@ $(GCC_COLOR)
 # COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
 # Assembler files ======================================================
 # create assembler files from C source files
 %.s : %.c
-	@echo 'creating $@'
+	@echo -e '$(TERM_BLUE)Creating $@$(TERM_NONE)'
 	$(AT)$(CC) $(CPPFLAGS) $(CFLAGS) -C -S $< -o $@
 
 # Linking ==============================================================
 # link ALL object files into binary
 $(BIN) : $(OBJ)
 	$(make_dir)
-	@echo -e '$(CLR_RED)Linking CXX executable $@$(CLR_NONE)'
-	$(AT)$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
+	@echo -e '$(TERM_RED)Linking CXX executable $@$(TERM_NONE)'
+	$(AT)$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@  $(GCC_COLOR)
 
 # Archiving ============================================================
 # create static library from ALL object files
 $(LIB) : $(OBJ)
 	$(make_dir)
 	$(AT)$(RM) $@
-	@echo -e '$(CLR_RED)Linking C/CXX static library $@$(CLR_NONE)'
-	$(AT)$(AR) rs $@ $^
+	@echo -e '$(TERM_RED)Linking C/CXX static library $@$(TERM_NONE)'
+	$(AT)$(AR) rs $@ $^  $(GCC_COLOR)
 # 	$(AT)$(AR) $(ARFLAGS) $@ $^
 
 ########################################################################
@@ -257,7 +296,7 @@ ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
 endif
 
 
-$(info  )
+# $(info  )
 
 # include $(ULTIMAKE_PATH)/ultimake-help.mk
 # include $(ULTIMAKE_PATH)/dot.mk
@@ -281,6 +320,10 @@ $(info  )
 
 
 # CHANGELOG ############################################################
+#
+# v1.30
+#     - fixed percentage (missing comma in function call, v1.29, line 134)
+#     - added sed command to colorize gcc output
 #
 # v1.29
 #     - fixed unwanted rebuilding of dependencies when target 'clean' is called repeatedly,
