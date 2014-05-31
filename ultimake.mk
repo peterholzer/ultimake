@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.31
-# 2014-05-31
+# Ultimake v1.32
+# 2014-06-01
 
 # TODO: create static libs directly in main-makefile with ultimake? see http://www.gnu.org/software/make/manual/make.html#Secondary-Expansion
 
@@ -196,32 +196,29 @@ $(SUBMAKE_LIBS) : | submake
 
 # Rules ################################################################
 
-
 # Dependency files =====================================================
-# generate dependency files from assembler source files
-$(OUT_DIR)/%.S.dep : %.S
+define build_dep
 	$(make_dir)
 	$(inc_progress)
 	$(print_dep)
 	$(save_progress)
+endef
+
+
+# generate dependency files from assembler source files
+$(OUT_DIR)/%.S.dep : %.S
+	$(build_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
 
 # generate dependency files from C source files
 $(OUT_DIR)/%.c.dep : %.c
-	$(make_dir)
-	$(inc_progress)
-	$(print_dep)
-	$(save_progress)
+	$(build_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $<
 
 # generate dependency files from C++ source files
 $(OUT_DIR)/%.cpp.dep : %.cpp
-	$(make_dir)
-	$(inc_progress)
-	$(print_dep)
-	$(save_progress)
+	$(build_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $<
-
 
 # Object files  ========================================================
 # compile object files from assembler source files
