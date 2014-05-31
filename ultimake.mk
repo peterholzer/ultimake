@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.30
-# 2014-05-30
+# Ultimake v1.31
+# 2014-05-31
 
 # TODO: create static libs directly in main-makefile with ultimake? see http://www.gnu.org/software/make/manual/make.html#Secondary-Expansion
 
@@ -12,11 +12,6 @@
 # http://aegis.sourceforge.net/auug97.pdf
 # http://www.conifersystems.com/whitepapers/gnu-make/
 
-
-# http://stackoverflow.com/questions/2738292/how-to-deal-with-recursive-dependencies-between-static-libraries-using-the-binut
-# While @nos provides a simple solution, it doesn't scale when there are multiple libraries involved and the mutual dependencies
-# are more complex. To sort out the problems ld provides --start-group archives --end-group.
-# In your particular case:
 # g++ test_obj.o --start-group -lA -lB --end-group -o test
 
 $(info )
@@ -60,10 +55,10 @@ MV    ?= mv -f
 # ARFLAGS ?= r
 
 # Default Target  ======================================================
-ifndef TARGET
-    TARGET := a.out
-    $(info TARGET not defined. Using default value $(TARGET))
-endif
+# ifndef TARGET
+#     TARGET := a.out
+#     $(info TARGET not defined. Using default value $(TARGET))
+# endif
 
 
 # Default Directories ==================================================
@@ -95,14 +90,15 @@ endif
 ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
 
 # filter Assembler/C/C++ sources
-SOURCE_FILES ?= $(filter %.S,$(ALL_FILES)) $(filter %.c,$(ALL_FILES)) $(filter %.cpp,$(ALL_FILES))
+# SOURCE_FILES ?= $(filter %.S,$(ALL_FILES)) $(filter %.c,$(ALL_FILES)) $(filter %.cpp,$(ALL_FILES))
+SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
 
 # Create lists of generated files ======================================
 # TODO: $(notdir ... unterordner und so
-LIB := $(filter lib%.a,$(TARGET))
-ifndef LIB
-	BIN := $(TARGET)
-endif
+# LIB := $(filter lib%.a,$(notdir TARGET)) $(filter lib%.so,$(notdir TARGET))
+# ifndef LIB
+#     BIN := $(TARGET)
+# endif
 
 # create list of dependency and object files from sources
 # and handle folder prefix and file extension
@@ -137,28 +133,23 @@ ifndef ULTIMAKE_NOCOLOR
          | sed -r 's/(.*error:.*)/$(GCC_COLOR_ERR)\1$(TERM_NONE)/;\
                    s/(.*warning:)/$(GCC_COLOR_WARN)\1$(TERM_NONE)/;\
                    s/(.*note:)/$(GCC_COLOR_NOTE)\1$(TERM_NONE)/' >&2
-
-#         SHELL := bash
-#         GCC_COLOR := 2> >(sed -r 's///' >&2)
     endif
 endif
 
 ifndef ULTIMAKE_NOPROGRESS
-    NUM_DEP_FILE=$(OUT_DIR)/.ultimake-rebuild-count
-    NUM_DEP = 0
-    NUM_OBJ = 0
-    NUM_OBJ_ALL = $(shell cat $(NUM_DEP_FILE))
-    count_dep = $(eval NUM_DEP := $(shell echo $(NUM_DEP)+1 | bc)) \
-        @echo -n $(NUM_DEP) > $(NUM_DEP_FILE); \
-        printf '$(TERM_CURSOR_UP)$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE) [$(NUM_DEP)/$(words $(OBJ))]\n';
-    #     @echo -n $(NUM_DEP) > $(NUM_DEP_FILE); printf '\r[$(NUM_DEP)/$(words $(OBJ))] $(TERM_PINK)Scanning dependencies$(TERM_NONE)';
-
-    count_obj = $(eval NUM_OBJ := $(shell echo $(NUM_OBJ)+1 | bc))
+    PROGRESS := 0
+    PROGRESS_FILE := $(OUT_DIR)/.ultimake-rebuild-count
+    PROGRESS_MAX = $(shell cat $(PROGRESS_FILE))
+    inc_progress  = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc))
+    save_progress = @echo -n $(PROGRESS) > $(PROGRESS_FILE);
+#     print_dep = @printf '$(TERM_CURSOR_UP)$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE) [$(PROGRESS)/$(words $(OBJ))]\n';
+    print_dep = @printf '\r$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE) [$(PROGRESS)/$(words $(OBJ))]';
 
     # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
     percentage = $(shell echo $(1)00/$(2) | bc)
-    print_obj = @printf '[%3d%%] $(TERM_GREEN)$1$(TERM_NONE)\n' '$(call percentage,$(NUM_OBJ),$(NUM_OBJ_ALL))'
+    print_obj = @printf '[%3d%%] $(TERM_GREEN)$1$(TERM_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
 else
+    print_dep = @printf '$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE)\n'
     print_obj = @printf '$(TERM_GREEN)$1$(TERM_NONE)\n'
 endif
 
@@ -167,10 +158,10 @@ make_dir = $(AT)-$(MKDIR) $(@D)
 
 # Phony Targets ########################################################
 
-.PHONY : clean run clean-all
+.PHONY : all clean run clean-all
 
 all : $(BIN) $(LIB)
-
+# all : $(TARGET)
 clean :
 	@echo 'Cleaning ...'
 	$(AT)-$(RM) $(BIN) $(LIB) $(OBJ) $(DEP)
@@ -182,39 +173,23 @@ clean-all :
 run : $(BIN)
 	./$(BIN)
 
-# 	@for dir in $(SUB_MAKES); do    \
-# 		$(MAKE) -C $$dir $(MAKECMDGOALS);     \
-# 	done
+# Submake Feature ######################################################
 
-# $(BIN) $(LIB) : | submake
-# .PHONY :  submake
-
-# submake :
-# 	@echo 'submake: Making $@'
-# 	@for dir in $(SUB_MAKES); do    \
-# 		$(MAKE) -C $$dir;       \
-# 	done
-
-
-# Submake ##############################################################
-
-LDFLAGS += -L$(dir $(LIB_FILES))
-LDFLAGS += -l$(patsubst lib%.a,%, $(notdir $(LIB_FILES)))
+LDFLAGS += $(foreach d,$(SUBMAKE_LIBS), -L$(dir $(d)))
+LDFLAGS += $(foreach f,$(SUBMAKE_LIBS), -l$(patsubst lib%.a,%, $(notdir $(f))))
 
 .PHONY : submake
-
 $(BIN) $(LIB) all clean : | submake
+$(TARGET) : $(SUBMAKE_LIBS) | submake
 
 submake :
-	@for dir in $(SUB_MAKES); do          \
-		$(MAKE) -C $$dir $(MAKECMDGOALS); \
-	done
+	@for dir in $(SUBMAKE_DIRS); do       \
+        $(MAKE) -C $$dir $(MAKECMDGOALS); \
+    done
 
-$(TARGET) : $(LIB_FILES) | submake
+$(SUBMAKE_LIBS) : | submake
 
-$(LIB_FILES) : submake
-
-
+########################################################################
 
 
 
@@ -226,19 +201,25 @@ $(LIB_FILES) : submake
 # generate dependency files from assembler source files
 $(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
-	$(count_dep)
+	$(inc_progress)
+	$(print_dep)
+	$(save_progress)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
 
 # generate dependency files from C source files
 $(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
-	$(count_dep)
+	$(inc_progress)
+	$(print_dep)
+	$(save_progress)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $<
 
 # generate dependency files from C++ source files
 $(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
-	$(count_dep)
+	$(inc_progress)
+	$(print_dep)
+	$(save_progress)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $<
 
 
@@ -246,21 +227,21 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 # compile object files from assembler source files
 $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$(make_dir)
-	$(count_obj)
+	$(inc_progress)
 	$(call print_obj,Building ASM object $@)
 	$(AT)$(COMPILE.S) $< -o $@ $(GCC_COLOR)
 
 # compile object files from C source files
 $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$(make_dir)
-	$(count_obj)
+	$(inc_progress)
 	$(call print_obj,Building C object $@)
 	$(AT)$(COMPILE.c) $< -o $@ $(GCC_COLOR)
 
 # compile object files from C++ source files
 $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$(make_dir)
-	$(count_obj)
+	$(inc_progress)
 	$(call print_obj,Building C++ object $@)
 	$(AT)$(COMPILE.cc) $< -o $@ $(GCC_COLOR)
 # COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
@@ -273,19 +254,24 @@ $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 
 # Linking ==============================================================
 # link ALL object files into binary
-$(BIN) : $(OBJ)
+# $(BIN) : $(OBJ)
+$(filter-out %.a %.so,$(TARGET)) : $(OBJ)
 	$(make_dir)
 	@echo -e '$(TERM_RED)Linking CXX executable $@$(TERM_NONE)'
 	$(AT)$(CXX) $(LDFLAGS) $(TARGET_ARCH) $^ -o $@  $(GCC_COLOR)
 
-# Archiving ============================================================
 # create static library from ALL object files
-$(LIB) : $(OBJ)
+$(filter %.a,$(TARGET)) : $(OBJ)
 	$(make_dir)
 	$(AT)$(RM) $@
 	@echo -e '$(TERM_RED)Linking C/CXX static library $@$(TERM_NONE)'
-	$(AT)$(AR) rs $@ $^  $(GCC_COLOR)
-# 	$(AT)$(AR) $(ARFLAGS) $@ $^
+	$(AT)$(AR) $(ARFLAGS) $@ $^
+
+# create shared library from ALL object files
+$(filter %.so,$(TARGET)) : $(OBJ)
+	$(make_dir)
+	@echo -e '$(TERM_RED)Linking C/CXX shared library $@$(TERM_NONE)'
+	$(AT)$(CXX) -shared $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
 
 ########################################################################
 # include generated dependency files
@@ -310,16 +296,11 @@ endif
 #       this makes half of the "-not" statements at the creation of the
 #       FILES variable useless
 
-# TODO: create shared library from ALL object files
-# $(LIB) : $(OBJ)
-# 	$(AT)$(MKDIR) $(@D)
-# 	@echo 'removing $@'
-# 	$(AT)$(RM) $@
-# 	@echo 'creating $@'
-# 	$(AT) $(CXX) -shared $(LDFLAGS) $(TARGET_ARCH) $^ -o $@
-
 
 # CHANGELOG ############################################################
+#
+# v1.31
+#     -
 #
 # v1.30
 #     - fixed percentage (missing comma in function call, v1.29, line 134)
