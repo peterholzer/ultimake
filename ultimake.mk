@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v1.32
+# Ultimake v1.33
 # 2014-06-01
 
 # TODO: create static libs directly in main-makefile with ultimake? see http://www.gnu.org/software/make/manual/make.html#Secondary-Expansion
@@ -160,18 +160,18 @@ make_dir = $(AT)-$(MKDIR) $(@D)
 
 .PHONY : all clean run clean-all
 
-all : $(BIN) $(LIB)
-# all : $(TARGET)
+all : $(TARGET)
+
 clean :
 	@echo 'Cleaning ...'
-	$(AT)-$(RM) $(BIN) $(LIB) $(OBJ) $(DEP)
+	$(AT)-$(RM) $(TARGET) $(OBJ) $(DEP)
 
 clean-all :
 	@echo 'Cleaning, really ...'
 	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -o -name "*.o" -delete)
 
-run : $(BIN)
-	./$(BIN)
+run : $(TARGET)
+	./$(TARGET)
 
 # Submake Feature ######################################################
 
@@ -179,7 +179,7 @@ LDFLAGS += $(foreach d,$(SUBMAKE_LIBS), -L$(dir $(d)))
 LDFLAGS += $(foreach f,$(SUBMAKE_LIBS), -l$(patsubst lib%.a,%, $(notdir $(f))))
 
 .PHONY : submake
-$(BIN) $(LIB) all clean : | submake
+$(TARGET) all clean : | submake
 $(TARGET) : $(SUBMAKE_LIBS) | submake
 
 submake :
@@ -198,7 +198,6 @@ $(SUBMAKE_LIBS) : | submake
 
 # Dependency files =====================================================
 define build_dep
-	$(make_dir)
 	$(inc_progress)
 	$(print_dep)
 	$(save_progress)
@@ -207,16 +206,19 @@ endef
 
 # generate dependency files from assembler source files
 $(OUT_DIR)/%.S.dep : %.S
+	$(make_dir)
 	$(build_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
 
 # generate dependency files from C source files
 $(OUT_DIR)/%.c.dep : %.c
+	$(make_dir)
 	$(build_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $<
 
 # generate dependency files from C++ source files
 $(OUT_DIR)/%.cpp.dep : %.cpp
+	$(make_dir)
 	$(build_dep)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $<
 
@@ -251,7 +253,6 @@ $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 
 # Linking ==============================================================
 # link ALL object files into binary
-# $(BIN) : $(OBJ)
 $(filter-out %.a %.so,$(TARGET)) : $(OBJ)
 	$(make_dir)
 	@echo -e '$(TERM_RED)Linking CXX executable $@$(TERM_NONE)'
@@ -296,8 +297,8 @@ endif
 
 # CHANGELOG ############################################################
 #
-# v1.31
-#     -
+# v1.31-v1.33
+#     - replaced BIN and LIB completely with TARGET
 #
 # v1.30
 #     - fixed percentage (missing comma in function call, v1.29, line 134)
