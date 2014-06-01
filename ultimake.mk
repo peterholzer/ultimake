@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.00
+# Ultimake v2.01
 # 2014-06-01
 
 # TODO: create static libs directly in main-makefile with ultimake? see http://www.gnu.org/software/make/manual/make.html#Secondary-Expansion
@@ -81,10 +81,6 @@ ifndef SOURCES
 endif
 
 
-find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name "*.S" -o -name "*.c" -o -name "*.cpp")))
-# vague_test_SOURCE_FILES := $(call find_source,$(vague_test_SOURCES))
-
-
 
 
 # Create lists of existing files =======================================
@@ -94,15 +90,13 @@ find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name 
 ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
 
 # filter Assembler/C/C++ sources
-# SOURCE_FILES ?= $(filter %.S,$(ALL_FILES)) $(filter %.c,$(ALL_FILES)) $(filter %.cpp,$(ALL_FILES))
 SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
 
+find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name "*.S" -o -name "*.c" -o -name "*.cpp")))
+# vague_test_SOURCE_FILES := $(call find_source,$(vague_test_SOURCES))
+
+
 # Create lists of generated files ======================================
-# TODO: $(notdir ... unterordner und so
-# LIB := $(filter lib%.a,$(notdir TARGET)) $(filter lib%.so,$(notdir TARGET))
-# ifndef LIB
-#     BIN := $(TARGET)
-# endif
 
 # create list of dependency and object files from sources
 # and handle folder prefix and file extension
@@ -113,30 +107,21 @@ SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
 # Fancy colored progress printing ======================================
 ifndef ULTIMAKE_NOCOLOR
     ifdef TERM
-#         COLOR_BUILD := $(shell tput setaf 2)
-#         COLOR_LINK  := $(shell tput setaf 1)$(shell tput bold)
-#         COLOR_DEP   := $(shell tput setaf 5)$(shell tput bold)
-#         COLOR_GEN   := $(shell tput setaf 4)$(shell tput bold)
-#         COLOR_WARN  := $(shell tput setaf 1)
-#         COLOR_NOTE  := $(shell tput setaf 3)
-#         COLOR_ERR   := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
-#         COLOR_NONE  := $(shell tput sgr0)
+        COLOR_BUILD := $(shell tput setaf 2)
+        COLOR_LINK  := $(shell tput setaf 1)$(shell tput bold)
+        COLOR_DEP   := $(shell tput setaf 5)$(shell tput bold)
+        COLOR_GEN   := $(shell tput setaf 4)$(shell tput bold)
+        COLOR_WARN  := $(shell tput setaf 1)
+        COLOR_NOTE  := $(shell tput setaf 3)
+        COLOR_ERR   := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
+        COLOR_NONE  := $(shell tput sgr0)
 
-        TERM_GREEN := $(shell tput setaf 2)
-        TERM_RED   := $(shell tput setaf 1)$(shell tput bold)
-        TERM_BLUE  := $(shell tput setaf 4)$(shell tput bold)
-        TERM_PINK  := $(shell tput setaf 5)$(shell tput bold)
-        TERM_NONE  := $(shell tput sgr0)
         TERM_CURSOR_UP := $(shell tput cuu1)
 
-#         GCC_COLOR_ERR := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
-        GCC_COLOR_WARN := $(shell tput setaf 1)
-        GCC_COLOR_NOTE := $(shell tput setaf 3)
-
         GCC_COLOR :=  2>&1 1>/dev/null \
-         | sed -r 's/(.*error:.*)/$(GCC_COLOR_ERR)\1$(TERM_NONE)/;\
-                   s/(.*warning:)/$(GCC_COLOR_WARN)\1$(TERM_NONE)/;\
-                   s/(.*note:)/$(GCC_COLOR_NOTE)\1$(TERM_NONE)/' >&2
+         | sed -r 's/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/;\
+                   s/(.*warning:)/$(COLOR_WARN)\1$(COLOR_NONE)/;\
+                   s/(.*note:)/$(COLOR_NOTE)\1$(COLOR_NONE)/' >&2
     endif
 endif
 
@@ -145,19 +130,17 @@ ifndef ULTIMAKE_NOPROGRESS
     PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
     PROGRESS_MAX = $(shell cat $(PROGRESS_FILE))
     inc_progress  = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc))
-#     define inc_progress
-#         PROGRESS := $(shell echo $(PROGRESS)+1 | bc)
-#     endef
     save_progress = @echo -n $(PROGRESS) > $(PROGRESS_FILE);
-#     print_dep = @printf '$(TERM_CURSOR_UP)$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE) [$(PROGRESS)/$(words $(OBJ))]\n';
-    print_dep = @printf '\r$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE) [$(PROGRESS)/$(words $(OBJ))]';
+    print_dep = @printf '$(TERM_CURSOR_UP)$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE) [$(PROGRESS)/$(words $(OBJ))]\n';
+#     print_dep = @printf '\r$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE) [$(PROGRESS)/$(words $(OBJ))]';
 
-    # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
+# calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
     percentage = $(shell echo $(1)00/$(2) | bc)
-    print_obj = @printf '[%3d%%] $(TERM_GREEN)$1$(TERM_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
+#     percentage = $(shell echo $(1)00/$(2) | bc) | $(shell echo $(1)/$(2))
+    print_obj = @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
 else
-    print_dep := @printf '$(TERM_PINK)Scanning dependencies of target $(TARGET)$(TERM_NONE)\n'
-    print_obj = @printf '$(TERM_GREEN)$1$(TERM_NONE)\n'
+    print_dep := @printf '$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE)\n'
+    print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
 endif
 
 make_dir = $(AT)-$(MKDIR) $(@D)
@@ -172,8 +155,9 @@ all : $(TARGET)
 clean :
 	@echo 'Cleaning ...'
 	$(AT)-$(RM) $(TARGET) $(OBJ) $(DEP)
-
-clean-all :
+	$(AT)-$(RM) $(foreach m,$(MODULES), $($m_TARGET) $($m_OBJ) $($m_DEP))
+#
+clean-all : clean
 	@echo 'Cleaning, really ...'
 	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -delete -o -name "*.o" -delete)
 
@@ -212,46 +196,50 @@ $(SUBMAKE_LIBS) : | submake
 
 
 
+print_build = @printf '[%3s%%] $1\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
+
+# 	$$(call print_obj,Building C object $$@)
 
 
 
-
-
+#-----------------------------------------------------------------------
 # create static library from ALL object files
 define static_lib
-$(info macro static_lib($1))
 $($1_TARGET) : $($1_OBJ)
 	$$(make_dir)
 	$(AT)$(RM) $$@
-	@echo -e '$(TERM_RED)Linking C/CXX static library $$@$(TERM_NONE)'
+	@echo -e '$(COLOR_LINK)Linking C/CXX static library $$@$(COLOR_NONE)'
 	$(AT)$($1_AR) $($1_ARFLAGS) $$@ $$^
+	$$(call print_build,Built target $1)
 endef
 
 
 # create shared library from ALL object files
 define shared_lib
-$(info macro shared_lib($1))
 $($1_TARGET) : $($1_OBJ)
 	$$(make_dir)
-	@echo -e '$(TERM_RED)Linking C/CXX shared library $$@$(TERM_NONE)'
+	@echo -e '$(COLOR_LINK)Linking C/CXX shared library $$@$(COLOR_NONE)'
 	$(AT)$$($1_CXX) -shared $$($1_LDFLAGS) $$($1_TARGET_ARCH) $$^ -o $$@
+	$$(call print_build,Built target $1)
 endef
+
 
 
 # link ALL object files into binary
 define executable
-$(info macro executable($1))
 $($1_TARGET) : $($1_OBJ)
 	$$(make_dir)
-	@echo -e '$(TERM_RED)Linking CXX executable $$@$(TERM_NONE)'
+	@echo -e '$(COLOR_LINK)Linking CXX executable $$@$(COLOR_NONE)'
 	$(AT)$($1_CXX) $($1_LDFLAGS) $($1_TARGET_ARCH) $$^ -o $$@  $(GCC_COLOR)
+	$$(call print_build,Built target $1)
 endef
 
 
+#-----------------------------------------------------------------------
 define file_lists
-$(info macro rules_macro($1))
 
 $1_AR  ?= $(AR)
+$1_AS  ?= $(AS)
 $1_CC  ?= $(CC)
 $1_CXX ?= $(CXX)
 $1_ARFLAGS  ?= $(ARFLAGS)
@@ -265,24 +253,9 @@ $1_SOURCE_FILES := $(call find_source,$($1_SOURCES))
 endef
 $(eval $(foreach module,$(MODULES),$(call file_lists,$(module))))
 
-# compile object files from C source files
 
-# compile object files from C++ source files
-
-
-# $(info $1_SOURCE_FILES: $($1_SOURCE_FILES))
-# $(info $1_DEP: $($1_DEP))
-# $(info $1_OBJ: $($1_OBJ))
-
-# $(filter %.S.o, $($1_OBJ)) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
-# 	$$(make_dir)
-# 	$$(inc_progress)
-# 	$$(call print_obj,Building ASM object $@)
-# 	$(AT)$($1_CC) $($1_CFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
-
-
+#-----------------------------------------------------------------------
 define deps_objs
-
 $1_DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1_SOURCE_FILES))
 $1_OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1_SOURCE_FILES))
 
@@ -291,7 +264,14 @@ $(eval $(foreach module,$(MODULES),$(call deps_objs,$(module))))
 
 
 
+#-----------------------------------------------------------------------
 define rules_macro
+
+$(filter %.S.o, $($1_OBJ)) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
+	$$(make_dir)
+	$$(inc_progress)
+	$$(call print_obj,Building ASM object $$@)
+	$(AT)$($1_AS) $($1_ASFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 
 $(filter %.c.o, $($1_OBJ)) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$$(make_dir)
@@ -309,42 +289,26 @@ $(if $(filter %.a, $($1_TARGET)),$(call static_lib,$1))
 $(if $(filter %.so,$($1_TARGET)),$(call shared_lib,$1))
 $(if $(filter-out %.a %.so,$($1_TARGET)),$(call executable,$1))
 
--include $($1_DEP)
+ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
+    -include $($1_DEP)
+endif
 
 endef
-
-$(if $(filter-out clean clean-all, $(MAKE_CMD_GOALS)), -include $($1_DEP))
-
-# ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
-#     -include $(DEP)
-# endif
-# $(if $(filter %.a,$1),$(call static_lib,$1),$(executable))
 
 $(file > ultimake-static.mk,$(foreach module,$(MODULES),$(call file_lists,$(module))))
 $(file >> ultimake-static.mk,$(foreach module,$(MODULES),$(call rules_macro,$(module))))
 
-# $(value rules_macro)
-$(info call file_lists ---------------------------------------------------)
-
-$(info call rules_macro ---------------------------------------------------)
 $(eval $(foreach module,$(MODULES),$(call rules_macro,$(module))))
-# $(eval $(call rules_macro,libmylua.a))
-# $(rules_macro)
-# $(info $(rules_macro))
-# $(info $(call rules_macro))
-# $(info $(value rules_macro))
-
 
 # generate dependency files from C source files
 
 
-# $(OUT_DIR)/%.S.dep : %.S
-# 	$(value make_dir)
-# 	$(AT)-$(MKDIR) $$(@D)
-# 	$(inc_progress)
-# 	$(print_dep)
-# 	$(save_progress)
-# 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
+$(OUT_DIR)/%.S.dep : %.S
+	$(make_dir)
+	$(inc_progress)
+	$(print_dep)
+	$(save_progress)
+	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
 
 $(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
@@ -360,33 +324,11 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 	$(save_progress)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $<
 
-
-
-
-# Object files  ========================================================
-# compile object files from assembler source files
-
-# COMPILE.c  = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
-
-# Assembler files ======================================================
 # create assembler files from C source files
 %.s : %.c
-	@echo -e '$(TERM_BLUE)Creating $@$(TERM_NONE)'
+	@echo -e '$(COLOR_GEN)Creating $@$(COLOR_NONE)'
 	$(AT)$(CC) $(CPPFLAGS) $(CFLAGS) -C -S $< -o $@
 
-# Linking ==============================================================
-
-
-########################################################################
-# include generated dependency files
-# MAKECMDGOALS = invoked target
-# in a less crazy language i would write "if MAKECMDGOALS!=clean && MAKECMDGOALS!=clean-all"
-# ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
-#     -include $(DEP)
-# endif
-
-
-# $(info  )
 
 # include $(ULTIMAKE_PATH)/ultimake-help.mk
 # include $(ULTIMAKE_PATH)/dot.mk
@@ -403,6 +345,8 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 
 # CHANGELOG ############################################################
 #
+# v2.00
+#     - introduced MODULE system
 # v1.31-v1.33
 #     - replaced BIN and LIB completely with TARGET
 #
