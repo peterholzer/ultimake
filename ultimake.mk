@@ -1,9 +1,14 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.01
-# 2014-06-01
+# Ultimake v2.02
+# 2014-06-03
 
-# TODO: create static libs directly in main-makefile with ultimake? see http://www.gnu.org/software/make/manual/make.html#Secondary-Expansion
+# Environment Variables:
+#   NOCOLOR    if TERM is not defined -> implicitely NOCOLOR
+#   NOPROGRESS
+#   VERBOSE
+#
+
 
 # TODO:  CFLAGS := -.../x/y
 # TODO:  CFLAGS := -isystem ../x/y keine Warnings für Systembibliotheken
@@ -75,10 +80,10 @@ MV    ?= mv -f
 
 
 # default values for source file search directories
-ifndef SOURCES
-    SOURCES := .
-    $(info SOURCES not defined. Using default value $(SOURCES))
-endif
+# ifndef SOURCES
+#     SOURCES := .
+#     $(info SOURCES not defined. Using default value $(SOURCES))
+# endif
 
 
 
@@ -87,10 +92,10 @@ endif
 # find all files in working directory
 # should we exclude all files in OUT_DIR, OUT_DIR ?
 # executes "find -type f" in several directories and cuts "./" prefix away
-ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
+# ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
 
 # filter Assembler/C/C++ sources
-SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
+# SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
 
 find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name "*.S" -o -name "*.c" -o -name "*.cpp")))
 # vague_test_SOURCE_FILES := $(call find_source,$(vague_test_SOURCES))
@@ -103,9 +108,8 @@ find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name 
 # DEP := $(patsubst %,$(OUT_DIR)/%.dep,$(SOURCE_FILES))
 # OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $(SOURCE_FILES))
 
-
 # Fancy colored progress printing ======================================
-ifndef ULTIMAKE_NOCOLOR
+ifndef NOCOLOR
     ifdef TERM
         COLOR_BUILD := $(shell tput setaf 2)
         COLOR_LINK  := $(shell tput setaf 1)$(shell tput bold)
@@ -115,17 +119,48 @@ ifndef ULTIMAKE_NOCOLOR
         COLOR_NOTE  := $(shell tput setaf 3)
         COLOR_ERR   := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
         COLOR_NONE  := $(shell tput sgr0)
-
         TERM_CURSOR_UP := $(shell tput cuu1)
 
+#       colorize gcc output and set exit code 1 if "error:" is found
         GCC_COLOR :=  2>&1 1>/dev/null \
-         | sed -r 's/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/;\
-                   s/(.*warning:)/$(COLOR_WARN)\1$(COLOR_NONE)/;\
-                   s/(.*note:)/$(COLOR_NOTE)\1$(COLOR_NONE)/' >&2
+         | sed -r 's/(.*warning:)/$(COLOR_WARN)\1$(COLOR_NONE)/;\
+                   s/(.*note:)/$(COLOR_NOTE)\1$(COLOR_NONE)/;\
+                   s/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/' \
+         | awk '{print} /error/{f=77} END{exit f}'  >&2
+
+
+        define GCC_COLOR :=
+            2>&1 1>/dev/null | awk '  \
+              {                       \
+                if(sub("^.*error:.*", "$(COLOR_ERR)&$(COLOR_NONE)")) {err=1} \
+                sub("^.*warning:.*", "$(COLOR_WARN)&$(COLOR_NONE)");        \
+                sub("^.*note:.*",    "$(COLOR_NOTE)&$(COLOR_NONE)");        \
+                print                 \
+              }                       \
+              END{exit err}'  >&2
+
+        endef
     endif
 endif
 
-ifndef ULTIMAKE_NOPROGRESS
+#          | perl -e ' s/error/errrror/g; '
+#          | sed  '/(.*error:)/,${s//$(COLOR_ERR)\1$(COLOR_NONE)/;b};$q1' >&2 $(RET)
+
+#       sed '/foo/ {s/f/b/;q}'
+#       '/search-string/{s//replacement-string/;h};${x;/./{x;q0};x;q1}'
+#                    {s/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/;q1};\
+
+
+
+# colorize gcc output and set exit code 1 if "error:" is found
+#         GCC_COLOR :=  2>&1 1>/dev/null \
+#          | sed -r '{s/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/;q0};\
+#                     s/(.*warning:)/$(COLOR_WARN)\1$(COLOR_NONE)/;\
+#                     s/(.*note:)/$(COLOR_NOTE)\1$(COLOR_NONE)/' >&2 $(RET)
+#       sed '/foo/ {s/f/b/;q}'
+
+
+ifndef NOPROGRESS
     PROGRESS := 0
     PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
     PROGRESS_MAX = $(shell cat $(PROGRESS_FILE))
@@ -137,7 +172,8 @@ ifndef ULTIMAKE_NOPROGRESS
 # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
     percentage = $(shell echo $(1)00/$(2) | bc)
 #     percentage = $(shell echo $(1)00/$(2) | bc) | $(shell echo $(1)/$(2))
-    print_obj = @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
+    print_obj   = @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
+    print_build = @printf '[%3s%%] $1\n'                            '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
 else
     print_dep := @printf '$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE)\n'
     print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
@@ -156,7 +192,7 @@ clean :
 	@echo 'Cleaning ...'
 	$(AT)-$(RM) $(TARGET) $(OBJ) $(DEP)
 	$(AT)-$(RM) $(foreach m,$(MODULES), $($m_TARGET) $($m_OBJ) $($m_DEP))
-#
+
 clean-all : clean
 	@echo 'Cleaning, really ...'
 	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -delete -o -name "*.o" -delete)
@@ -194,11 +230,6 @@ $(SUBMAKE_LIBS) : | submake
 
 
 
-
-
-print_build = @printf '[%3s%%] $1\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
-
-# 	$$(call print_obj,Building C object $$@)
 
 
 
@@ -267,24 +298,27 @@ $(eval $(foreach module,$(MODULES),$(call deps_objs,$(module))))
 #-----------------------------------------------------------------------
 define rules_macro
 
+$(if $(filter %.S.o, $($1_OBJ)),
 $(filter %.S.o, $($1_OBJ)) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building ASM object $$@)
 	$(AT)$($1_AS) $($1_ASFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
-
+)
+$(if $(filter %.c.o, $($1_OBJ)),
 $(filter %.c.o, $($1_OBJ)) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building C object $$@)
 	$(AT)$($1_CC) $($1_CFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
-
+)
+$(if $(filter %.cpp.o, $($1_OBJ)),
 $(filter %.cpp.o, $($1_OBJ)) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building C++ object $$@)
 	$(AT)$($1_CXX) $($1_CXXFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
-
+)
 $(if $(filter %.a, $($1_TARGET)),$(call static_lib,$1))
 $(if $(filter %.so,$($1_TARGET)),$(call shared_lib,$1))
 $(if $(filter-out %.a %.so,$($1_TARGET)),$(call executable,$1))
@@ -296,13 +330,12 @@ endif
 endef
 
 $(file > ultimake-static.mk,$(foreach module,$(MODULES),$(call file_lists,$(module))))
+$(file >> ultimake-static.mk,$(foreach module,$(MODULES),$(call deps_objs,$(module))))
 $(file >> ultimake-static.mk,$(foreach module,$(MODULES),$(call rules_macro,$(module))))
 
 $(eval $(foreach module,$(MODULES),$(call rules_macro,$(module))))
 
-# generate dependency files from C source files
-
-
+# generate dependency files from C source files ------------------------
 $(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$(inc_progress)
@@ -330,6 +363,18 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 	$(AT)$(CC) $(CPPFLAGS) $(CFLAGS) -C -S $< -o $@
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 # include $(ULTIMAKE_PATH)/ultimake-help.mk
 # include $(ULTIMAKE_PATH)/dot.mk
 # include $(ULTIMAKE_PATH)/devtools.mk
@@ -345,8 +390,12 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 
 # CHANGELOG ############################################################
 #
+# v2.02
+#     - replaced ULTIMAKE_NOCOLOR with NOCOLOR, ULTIMAKE_NOPROGRESS with NOPROGRESS
+#
 # v2.00
 #     - introduced MODULE system
+#
 # v1.31-v1.33
 #     - replaced BIN and LIB completely with TARGET
 #
