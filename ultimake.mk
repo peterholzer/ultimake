@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.02
+# Ultimake v2.03
 # 2014-06-03
 
 # Environment Variables:
@@ -69,22 +69,6 @@ MV    ?= mv -f
 # Default Directories ==================================================
 
 
-# deprecated: default values for include file search directories
-# (will automatically convert to "gcc -I<DIRECTORY>)
-#ifdef INCLUDES
-#    $(info )$(info INCLUDES is deprecated)
-#    $(info alternative 1: CPPFLAGS += -I<include-path>)
-#    $(info alternative 2: CPPFLAGS += $$(foreach inc,$$(INCLUDES),-I$$(inc)))
-#    $(info )$(error )
-#endif
-
-
-# default values for source file search directories
-# ifndef SOURCES
-#     SOURCES := .
-#     $(info SOURCES not defined. Using default value $(SOURCES))
-# endif
-
 
 
 
@@ -108,7 +92,7 @@ find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name 
 # DEP := $(patsubst %,$(OUT_DIR)/%.dep,$(SOURCE_FILES))
 # OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $(SOURCE_FILES))
 
-# Fancy colored progress printing ======================================
+# Colorization for Make and GCC output =================================
 ifndef NOCOLOR
     ifdef TERM
         COLOR_BUILD := $(shell tput setaf 2)
@@ -122,13 +106,21 @@ ifndef NOCOLOR
         TERM_CURSOR_UP := $(shell tput cuu1)
 
 #       colorize gcc output and set exit code 1 if "error:" is found
-        GCC_COLOR :=  2>&1 1>/dev/null \
-         | sed -r 's/(.*warning:)/$(COLOR_WARN)\1$(COLOR_NONE)/;\
-                   s/(.*note:)/$(COLOR_NOTE)\1$(COLOR_NONE)/;\
-                   s/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/' \
-         | awk '{print} /error/{f=77} END{exit f}'  >&2
-
-
+        define GCC_COLOR :=
+            2>&1 1>/dev/null | awk '  \
+              {                       \
+                if(sub("^.*error:.*",         "$(COLOR_ERR)&$(COLOR_NONE)")) {err=1}    \
+                else if(sub("^.*warning:.*", "$(COLOR_WARN)&$(COLOR_NONE)")) {}         \
+                else if(sub("^.*note:.*",    "$(COLOR_NOTE)&$(COLOR_NONE)")) {}         \
+                else if(sub("/\*.*\*/",      "$(shell tput setaf 5)&$(COLOR_NONE)")) {} \
+                else { \
+                    gsub("\+|-|\*|/|:|\(|\)|<|>", "$(shell tput setaf 1)$(shell tput bold)&$(COLOR_NONE)") \
+                    gsub("cast|exp",              "$(shell tput setaf 4)$(shell tput bold)&$(COLOR_NONE)") \
+                }        \
+                print                 \
+              }                       \
+              END{exit err}'  >&2
+        endef
         define GCC_COLOR :=
             2>&1 1>/dev/null | awk '  \
               {                       \
@@ -138,28 +130,12 @@ ifndef NOCOLOR
                 print                 \
               }                       \
               END{exit err}'  >&2
-
         endef
     endif
 endif
 
-#          | perl -e ' s/error/errrror/g; '
-#          | sed  '/(.*error:)/,${s//$(COLOR_ERR)\1$(COLOR_NONE)/;b};$q1' >&2 $(RET)
 
-#       sed '/foo/ {s/f/b/;q}'
-#       '/search-string/{s//replacement-string/;h};${x;/./{x;q0};x;q1}'
-#                    {s/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/;q1};\
-
-
-
-# colorize gcc output and set exit code 1 if "error:" is found
-#         GCC_COLOR :=  2>&1 1>/dev/null \
-#          | sed -r '{s/(.*error:.*)/$(COLOR_ERR)\1$(COLOR_NONE)/;q0};\
-#                     s/(.*warning:)/$(COLOR_WARN)\1$(COLOR_NONE)/;\
-#                     s/(.*note:)/$(COLOR_NOTE)\1$(COLOR_NONE)/' >&2 $(RET)
-#       sed '/foo/ {s/f/b/;q}'
-
-
+# Show progress percentage =============================================
 ifndef NOPROGRESS
     PROGRESS := 0
     PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
@@ -186,7 +162,7 @@ make_dir = $(AT)-$(MKDIR) $(@D)
 
 .PHONY : all clean run clean-all
 
-all : $(TARGET)
+all : $(TARGET) $(foreach m,$(MODULES), $(m_TARGET))
 
 clean :
 	@echo 'Cleaning ...'
@@ -218,20 +194,7 @@ $(SUBMAKE_LIBS) : | submake
 
 ########################################################################
 
-
-
-
 # Rules ################################################################
-
-# Dependency files =====================================================
-# generate dependency files from assembler source files
-
-
-
-
-
-
-
 
 #-----------------------------------------------------------------------
 # create static library from ALL object files
@@ -244,7 +207,6 @@ $($1_TARGET) : $($1_OBJ)
 	$$(call print_build,Built target $1)
 endef
 
-
 # create shared library from ALL object files
 define shared_lib
 $($1_TARGET) : $($1_OBJ)
@@ -253,8 +215,6 @@ $($1_TARGET) : $($1_OBJ)
 	$(AT)$$($1_CXX) -shared $$($1_LDFLAGS) $$($1_TARGET_ARCH) $$^ -o $$@
 	$$(call print_build,Built target $1)
 endef
-
-
 
 # link ALL object files into binary
 define executable
@@ -328,14 +288,15 @@ ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
 endif
 
 endef
-
-$(file > ultimake-static.mk,$(foreach module,$(MODULES),$(call file_lists,$(module))))
-$(file >> ultimake-static.mk,$(foreach module,$(MODULES),$(call deps_objs,$(module))))
-$(file >> ultimake-static.mk,$(foreach module,$(MODULES),$(call rules_macro,$(module))))
-
 $(eval $(foreach module,$(MODULES),$(call rules_macro,$(module))))
 
-# generate dependency files from C source files ------------------------
+$(shell mkdir -p $(OUT_DIR))
+$(file > $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call file_lists,$(module))))
+$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call deps_objs,$(module))))
+$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call rules_macro,$(module))))
+
+# Dependency files =====================================================
+# generate dependency files from source files ------------------------
 $(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$(inc_progress)
@@ -366,15 +327,6 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 
 
 
-
-
-
-
-
-
-
-
-
 # include $(ULTIMAKE_PATH)/ultimake-help.mk
 # include $(ULTIMAKE_PATH)/dot.mk
 # include $(ULTIMAKE_PATH)/devtools.mk
@@ -389,6 +341,9 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 
 
 # CHANGELOG ############################################################
+#
+# v2.03
+#     -
 #
 # v2.02
 #     - replaced ULTIMAKE_NOCOLOR with NOCOLOR, ULTIMAKE_NOPROGRESS with NOPROGRESS
