@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.03
-# 2014-06-03
+# Ultimake v2.04
+# 2014-06-07
 
 # Environment Variables:
 #   NOCOLOR    if TERM is not defined -> implicitely NOCOLOR
@@ -9,6 +9,8 @@
 #   VERBOSE
 #
 
+# TODO: automatically create phony target for each target
+# TODO: support module_CPPFLAGS variable for dependency creation
 
 # TODO:  CFLAGS := -.../x/y
 # TODO:  CFLAGS := -isystem ../x/y keine Warnings für Systembibliotheken
@@ -54,7 +56,7 @@ OUT_DIR ?= debug
 AR    ?= ar
 CC    ?= gcc
 CXX   ?= g++
-MKDIR ?= mkdir -p -v
+MKDIR ?= mkdir -p
 RM    ?= rm -f
 MV    ?= mv -f
 # ARFLAGS ?= r
@@ -149,7 +151,7 @@ ifndef NOPROGRESS
     percentage = $(shell echo $(1)00/$(2) | bc)
 #     percentage = $(shell echo $(1)00/$(2) | bc) | $(shell echo $(1)/$(2))
     print_obj   = @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
-    print_build = @printf '[%3s%%] $1\n'                            '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
+    print_build = printf '[%3s%%] $1\n'                            '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
 else
     print_dep := @printf '$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE)\n'
     print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
@@ -162,19 +164,34 @@ make_dir = $(AT)-$(MKDIR) $(@D)
 
 .PHONY : all clean run clean-all
 
-all : $(TARGET) $(foreach m,$(MODULES), $(m_TARGET))
+
+ifdef TARGET
+    $(info TARGET defined. setting $$(TARGETS) and $$(main))
+    TARGETS := main
+    main := $(TARGET)
+    all : $(TARGET)
+endif
+ifdef MODULES
+    $(info Deprecated option $$(MODULES) defined. this is now $$(TARGETS))
+else
+    MODULES := $(TARGETS)
+endif
+
+
+
+all : $(foreach m,$(MODULES), $($m))
 
 clean :
 	@echo 'Cleaning ...'
 	$(AT)-$(RM) $(TARGET) $(OBJ) $(DEP)
-	$(AT)-$(RM) $(foreach m,$(MODULES), $($m_TARGET) $($m_OBJ) $($m_DEP))
+	$(AT)-$(RM) $(foreach m,$(MODULES), $($m) $($m_OBJ) $($m_DEP))
 
 clean-all : clean
 	@echo 'Cleaning, really ...'
 	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -delete -o -name "*.o" -delete)
 
-run : $(TARGET)
-	./$(TARGET)
+run : $(main)
+	./$(main)
 
 # Submake Feature ######################################################
 
@@ -199,30 +216,30 @@ $(SUBMAKE_LIBS) : | submake
 #-----------------------------------------------------------------------
 # create static library from ALL object files
 define static_lib
-$($1_TARGET) : $($1_OBJ)
+$($1) : $($1_OBJ)
 	$$(make_dir)
 	$(AT)$(RM) $$@
-	@echo -e '$(COLOR_LINK)Linking C/CXX static library $$@$(COLOR_NONE)'
-	$(AT)$($1_AR) $($1_ARFLAGS) $$@ $$^
-	$$(call print_build,Built target $1)
+	@echo -e '$$(COLOR_LINK)Linking C/CXX static library $$@$$(COLOR_NONE)'
+	$(AT)$($1_AR) $($1_ARFLAGS) $$@ $$^ \
+      && $$(call print_build,Built target $1)
 endef
 
 # create shared library from ALL object files
 define shared_lib
-$($1_TARGET) : $($1_OBJ)
+$($1) : $($1_OBJ)
 	$$(make_dir)
-	@echo -e '$(COLOR_LINK)Linking C/CXX shared library $$@$(COLOR_NONE)'
-	$(AT)$$($1_CXX) -shared $$($1_LDFLAGS) $$($1_TARGET_ARCH) $$^ -o $$@
-	$$(call print_build,Built target $1)
+	@echo -e '$$(COLOR_LINK)Linking C/CXX shared library $$@$$(COLOR_NONE)'
+	$(AT)$$($1_CXX) -shared $$($1_TARGET_ARCH) $$^ $$($1_LDFLAGS) -o $$@ $$(GCC_COLOR) \
+      && $$(call print_build,Built target $1)
 endef
 
 # link ALL object files into binary
 define executable
-$($1_TARGET) : $($1_OBJ)
+$($1) : $($1_OBJ)
 	$$(make_dir)
-	@echo -e '$(COLOR_LINK)Linking CXX executable $$@$(COLOR_NONE)'
-	$(AT)$($1_CXX) $($1_LDFLAGS) $($1_TARGET_ARCH) $$^ -o $$@  $(GCC_COLOR)
-	$$(call print_build,Built target $1)
+	@echo -e '$$(COLOR_LINK)Linking CXX executable $$@$$(COLOR_NONE)'
+	$(AT)$($1_CXX)  $($1_TARGET_ARCH) $$^ $$($1_LDFLAGS) -o $$@  $$(GCC_COLOR) \
+      && $$(call print_build,Built target $1)
 endef
 
 
@@ -239,6 +256,7 @@ $1_CFLAGS   ?= $(CFLAGS)
 $1_CXXFLAGS ?= $(CXXFLAGS)
 $1_LDFLAGS  ?= $(LDFLAGS)
 $1_TARGET_ARCH ?= $(TARGET_ARCH)
+$1_SOURCES ?= $(SOURCES)
 $1_SOURCE_FILES := $(call find_source,$($1_SOURCES))
 
 endef
@@ -279,9 +297,9 @@ $(filter %.cpp.o, $($1_OBJ)) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$$(call print_obj,Building C++ object $$@)
 	$(AT)$($1_CXX) $($1_CXXFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
-$(if $(filter %.a, $($1_TARGET)),$(call static_lib,$1))
-$(if $(filter %.so,$($1_TARGET)),$(call shared_lib,$1))
-$(if $(filter-out %.a %.so,$($1_TARGET)),$(call executable,$1))
+$(if $(filter %.a, $($1)),$(call static_lib,$1))
+$(if $(filter %.so,$($1)),$(call shared_lib,$1))
+$(if $(filter-out %.a %.so,$($1)),$(call executable,$1))
 
 ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
     -include $($1_DEP)
@@ -332,15 +350,11 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 # include $(ULTIMAKE_PATH)/devtools.mk
 # include $(ULTIMAKE_PATH)/gcc-warnings.mk
 
-# TODO #################################################################
-#
-# TODO: for some reason, there is absolutely no leading "./" allowed,
-#       otherwise the %-rules wont work
-#       this makes half of the "-not" statements at the creation of the
-#       FILES variable useless
-
 
 # CHANGELOG ############################################################
+#
+# v2.04
+#     - removed "_TARGET" suffix from target variable
 #
 # v2.03
 #     -
