@@ -1,7 +1,9 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.04
-# 2014-06-07
+# Ultimake v2.05
+# 2014-06-27
+
+# TODO: call with --warn-undefined-variables
 
 # Environment Variables:
 #   NOCOLOR    if TERM is not defined -> implicitely NOCOLOR
@@ -265,33 +267,75 @@ $(eval $(foreach module,$(MODULES),$(call file_lists,$(module))))
 
 #-----------------------------------------------------------------------
 define deps_objs
+
 $1_DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1_SOURCE_FILES))
+
 $1_OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1_SOURCE_FILES))
 
 endef
 $(eval $(foreach module,$(MODULES),$(call deps_objs,$(module))))
 
+#-----------------------------------------------------------------------
+define deps_objs2
 
+$1_DEP_AS  := $(filter %.S.dep, $($1_DEP))
+$1_DEP_C   := $(filter %.c.dep, $($1_DEP))
+$1_DEP_CXX := $(filter %.cpp.dep, $($1_DEP))
+$1_OBJ_AS  := $(filter %.S.o, $($1_OBJ))
+$1_OBJ_C   := $(filter %.c.o, $($1_OBJ))
+$1_OBJ_CXX := $(filter %.cpp.o, $($1_OBJ))
+
+endef
+$(eval $(foreach module,$(MODULES),$(call deps_objs2,$(module))))
 
 #-----------------------------------------------------------------------
 define rules_macro
 
-$(if $(filter %.S.o, $($1_OBJ)),
-$(filter %.S.o, $($1_OBJ)) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
+.PHONY : $1
+$1 : $($1)
+
+$(if $($1_DEP_AS),
+$($1_DEP_AS) : $(OUT_DIR)/%.S.dep : %.S
+	$$(make_dir)
+	$$(inc_progress)
+	$$(print_dep)
+	$$(save_progress)
+	$(AT)$(CC) $(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $$<
+)
+$(if $($1_DEP_C),
+$($1_DEP_C) : $(OUT_DIR)/%.c.dep : %.c
+	$$(make_dir)
+	$$(inc_progress)
+	$$(print_dep)
+	$$(save_progress)
+	$(AT)$(CC) $(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $$<
+)
+$(if $($1_DEP_CXX),
+$($1_DEP_CXX) : $(OUT_DIR)/%.cpp.dep : %.cpp
+	$$(make_dir)
+	$$(inc_progress)
+	$$(print_dep)
+	$$(save_progress)
+	$(AT)$(CC) $$($1_CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
+)
+
+
+$(if $($1_OBJ_AS),
+$($1_OBJ_AS) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building ASM object $$@)
 	$(AT)$($1_AS) $($1_ASFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
-$(if $(filter %.c.o, $($1_OBJ)),
-$(filter %.c.o, $($1_OBJ)) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
+$(if $($1_OBJ_C),
+$($1_OBJ_C) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building C object $$@)
 	$(AT)$($1_CC) $($1_CFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
-$(if $(filter %.cpp.o, $($1_OBJ)),
-$(filter %.cpp.o, $($1_OBJ)) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
+$(if $($1_OBJ_CXX),
+$($1_OBJ_CXX) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building C++ object $$@)
@@ -315,26 +359,6 @@ $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call rules
 
 # Dependency files =====================================================
 # generate dependency files from source files ------------------------
-$(OUT_DIR)/%.S.dep : %.S
-	$(make_dir)
-	$(inc_progress)
-	$(print_dep)
-	$(save_progress)
-	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $<
-
-$(OUT_DIR)/%.c.dep : %.c
-	$(make_dir)
-	$(inc_progress)
-	$(print_dep)
-	$(save_progress)
-	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $<
-
-$(OUT_DIR)/%.cpp.dep : %.cpp
-	$(make_dir)
-	$(inc_progress)
-	$(print_dep)
-	$(save_progress)
-	$(AT)$(CC) $(CPPFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $<
 
 # create assembler files from C source files
 %.s : %.c
@@ -352,6 +376,9 @@ $(OUT_DIR)/%.cpp.dep : %.cpp
 
 
 # CHANGELOG ############################################################
+#
+# v2.05
+#     - fixed include path orders for dependency generation
 #
 # v2.04
 #     - removed "_TARGET" suffix from target variable
