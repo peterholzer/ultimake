@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.05
-# 2014-06-27
+# Ultimake v2.06
+# 2014-08-13
 
 # TODO: call with --warn-undefined-variables
 
@@ -30,6 +30,22 @@ $(info )
 ifdef ULTIMAKE_NAME
     $(error it seems you self-included ultimake.)
 endif
+ifdef MODULES
+    $(err Deprecated option $$(MODULES) defined.)
+endif
+ifdef TARGET
+    $(err Deprecated option $$(TARGET) defined.)
+endif
+ifndef TARGETS
+    $(info TARGETS not defined. Creating default target 'main')
+    TARGETS := main
+    main := a.out
+endif
+
+# ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
+#     NOPROGRESS:=1
+# endif
+
 
 # CC := sleep 0.$$RANDOM; gcc
 
@@ -60,6 +76,7 @@ CC    ?= gcc
 CXX   ?= g++
 MKDIR ?= mkdir -p
 RM    ?= rm -f
+RM    := echo rm -f
 MV    ?= mv -f
 # ARFLAGS ?= r
 
@@ -78,18 +95,17 @@ MV    ?= mv -f
 
 # Create lists of existing files =======================================
 # find all files in working directory
-# should we exclude all files in OUT_DIR, OUT_DIR ?
+# should we exclude all files in OUT_DIR ?
 # executes "find -type f" in several directories and cuts "./" prefix away
 # ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
 
-# filter Assembler/C/C++ sources
+
 # SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
 
 find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name "*.S" -o -name "*.c" -o -name "*.cpp")))
 # vague_test_SOURCE_FILES := $(call find_source,$(vague_test_SOURCES))
 
 
-# Create lists of generated files ======================================
 
 # create list of dependency and object files from sources
 # and handle folder prefix and file extension
@@ -129,8 +145,8 @@ ifndef NOCOLOR
             2>&1 1>/dev/null | awk '  \
               {                       \
                 if(sub("^.*error:.*", "$(COLOR_ERR)&$(COLOR_NONE)")) {err=1} \
-                sub("^.*warning:.*", "$(COLOR_WARN)&$(COLOR_NONE)");        \
-                sub("^.*note:.*",    "$(COLOR_NOTE)&$(COLOR_NONE)");        \
+                sub("^.*warning:.*", "$(COLOR_WARN)&$(COLOR_NONE)");         \
+                sub("^.*note:.*",    "$(COLOR_NOTE)&$(COLOR_NONE)");         \
                 print                 \
               }                       \
               END{exit err}'  >&2
@@ -162,31 +178,23 @@ endif
 make_dir = $(AT)-$(MKDIR) $(@D)
 
 
-# Phony Targets ########################################################
+# Phony Targets ========================================================
 
 .PHONY : all clean run clean-all
 
 
-ifdef TARGET
-    $(info TARGET defined. setting $$(TARGETS) and $$(main))
-    TARGETS := main
-    main := $(TARGET)
-    all : $(TARGET)
-endif
-ifdef MODULES
-    $(info Deprecated option $$(MODULES) defined. this is now $$(TARGETS))
-else
-    MODULES := $(TARGETS)
-endif
 
 
 
-all : $(foreach m,$(MODULES), $($m))
+
+
+
+all : $(foreach t,$(TARGETS), $($t))
 
 clean :
 	@echo 'Cleaning ...'
-	$(AT)-$(RM) $(TARGET) $(OBJ) $(DEP)
-	$(AT)-$(RM) $(foreach m,$(MODULES), $($m) $($m_OBJ) $($m_DEP))
+# 	$(AT)-$(RM) $(TARGETS) $(OBJ) $(DEP)
+	$(AT)-$(RM) $(foreach t,$(TARGETS), $($t) $($t_OBJ) $($t_DEP))
 
 clean-all : clean
 	@echo 'Cleaning, really ...'
@@ -195,14 +203,14 @@ clean-all : clean
 run : $(main)
 	./$(main)
 
-# Submake Feature ######################################################
+# Submake Feature ======================================================
 
 LDFLAGS += $(foreach d,$(SUBMAKE_LIBS), -L$(dir $(d)))
 LDFLAGS += $(foreach f,$(SUBMAKE_LIBS), -l$(patsubst lib%.a,%, $(notdir $(f))))
 
 .PHONY : submake
-$(TARGET) all clean : | submake
-$(TARGET) : $(SUBMAKE_LIBS) | submake
+$(TARGETS) all clean : | submake
+$(TARGETS) : $(SUBMAKE_LIBS) | submake
 
 submake :
 	@for dir in $(SUBMAKE_DIRS); do       \
@@ -211,12 +219,12 @@ submake :
 
 $(SUBMAKE_LIBS) : | submake
 
-########################################################################
+#=======================================================================
 
 # Rules ################################################################
 
 #-----------------------------------------------------------------------
-# create static library from ALL object files
+# create static library from object files
 define static_lib
 $($1) : $($1_OBJ)
 	$$(make_dir)
@@ -226,7 +234,7 @@ $($1) : $($1_OBJ)
       && $$(call print_build,Built target $1)
 endef
 
-# create shared library from ALL object files
+# create shared library from object files
 define shared_lib
 $($1) : $($1_OBJ)
 	$$(make_dir)
@@ -235,7 +243,7 @@ $($1) : $($1_OBJ)
       && $$(call print_build,Built target $1)
 endef
 
-# link ALL object files into binary
+# link object files into binary
 define executable
 $($1) : $($1_OBJ)
 	$$(make_dir)
@@ -262,21 +270,27 @@ $1_SOURCES ?= $(SOURCES)
 $1_SOURCE_FILES := $(call find_source,$($1_SOURCES))
 
 endef
-$(eval $(foreach module,$(MODULES),$(call file_lists,$(module))))
+$(eval $(foreach target,$(TARGETS),$(call file_lists,$(target))))
+
+# $1_DEP = $$(patsubst %,$$(OUT_DIR)/%.dep,$$($1_SOURCE_FILES))
+# $1_OBJ = $$(patsubst %,$$(OUT_DIR)/%.o,  $$($1_SOURCE_FILES))
 
 
+# Create lists of generated files ======================================
 #-----------------------------------------------------------------------
-define deps_objs
+define file_lists2
 
 $1_DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1_SOURCE_FILES))
 
 $1_OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1_SOURCE_FILES))
 
-endef
-$(eval $(foreach module,$(MODULES),$(call deps_objs,$(module))))
 
+endef
+$(eval $(foreach target,$(TARGETS),$(call file_lists2,$(target))))
+
+# filter Assembler/C/C++ objects and dependencies
 #-----------------------------------------------------------------------
-define deps_objs2
+define file_lists3
 
 $1_DEP_AS  := $(filter %.S.dep, $($1_DEP))
 $1_DEP_C   := $(filter %.c.dep, $($1_DEP))
@@ -286,7 +300,7 @@ $1_OBJ_C   := $(filter %.c.o, $($1_OBJ))
 $1_OBJ_CXX := $(filter %.cpp.o, $($1_OBJ))
 
 endef
-$(eval $(foreach module,$(MODULES),$(call deps_objs2,$(module))))
+$(eval $(foreach target,$(TARGETS),$(call file_lists3,$(target))))
 
 #-----------------------------------------------------------------------
 define rules_macro
@@ -350,12 +364,15 @@ ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
 endif
 
 endef
-$(eval $(foreach module,$(MODULES),$(call rules_macro,$(module))))
+$(eval $(foreach target,$(TARGETS),$(call rules_macro,$(target))))
+
+#-----------------------------------------------------------------------
 
 $(shell mkdir -p $(OUT_DIR))
-$(file > $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call file_lists,$(module))))
-$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call deps_objs,$(module))))
-$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call rules_macro,$(module))))
+$(file > $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_lists,$(target))))
+$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_lists2,$(target))))
+$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_lists3,$(target))))
+$(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call rules_macro,$(target))))
 
 # Dependency files =====================================================
 # generate dependency files from source files ------------------------
@@ -376,6 +393,10 @@ $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach module,$(MODULES),$(call rules
 
 
 # CHANGELOG ############################################################
+#
+# v2.06
+#     - removed deprecated macro MODULES, replaced all occurences with TARGETS
+#     - removed TARGET (without S)
 #
 # v2.05
 #     - fixed include path orders for dependency generation
