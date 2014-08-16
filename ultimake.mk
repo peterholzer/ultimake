@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Author: Peter Holzer
-# Ultimake v2.06
-# 2014-08-13
+# Ultimake v2.07
+# 2014-08-14
 
 # TODO: call with --warn-undefined-variables
 
@@ -66,31 +66,48 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 # path of this makefile
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
+# Default Directories ==================================================
+
 # default values for generated directories
 OUT_DIR ?= debug
 
 
-# Default Tools ========================================================
+# TODO: Default Tools ========================================================
 AR    ?= ar
 CC    ?= gcc
 CXX   ?= g++
 MKDIR ?= mkdir -p
 RM    ?= rm -f
-RM    := echo rm -f
+# RM    := echo rm -f
 MV    ?= mv -f
 # ARFLAGS ?= r
 
-# Default Target  ======================================================
-# ifndef TARGET
-#     TARGET := a.out
-#     $(info TARGET not defined. Using default value $(TARGET))
-# endif
 
+# debug output =========================================================
+print_vars = $(foreach var,$1,$(info $(var) = "$($(var))"   [$(origin $(var))] ))
 
-# Default Directories ==================================================
+# print_vars = $(foreach var,$1,@printf "    %10s = %50s [%s]\n" "$(var)" "$($(var))" "\"$(origin $(var))\""  )
 
+.PHONY : print_settings
 
+print_settings:
+	$(info Tools:)
+	$(call print_vars,AR AS CC CXX MKDIR MV RM LD)
+	$(info )
+	$(info Places:)
+	$(call print_vars,OBJDIR DESTDIR srcdir)
+	$(info )
+	$(call print_vars,TARGETS)
+	$(info )
 
+	$(foreach target,$(TARGETS),$(foreach member,.SOURCES _SOURCE_FILES .CPPFLAGS .CFLAGS .CXXFLAGS .LDFLAGS,$(call print_vars,$(target)$(member))) $(info ))
+
+	$(info )
+	$(call print_vars,.LIBPATTERNS)
+
+	$(info )
+	$(info )
+#=======================================================================
 
 
 # Create lists of existing files =======================================
@@ -230,7 +247,7 @@ $($1) : $($1_OBJ)
 	$$(make_dir)
 	$(AT)$(RM) $$@
 	@echo -e '$$(COLOR_LINK)Linking C/CXX static library $$@$$(COLOR_NONE)'
-	$(AT)$($1_AR) $($1_ARFLAGS) $$@ $$^ \
+	$(AT)$($1.AR) $($1.ARFLAGS) $$@ $$^ \
       && $$(call print_build,Built target $1)
 endef
 
@@ -239,7 +256,7 @@ define shared_lib
 $($1) : $($1_OBJ)
 	$$(make_dir)
 	@echo -e '$$(COLOR_LINK)Linking C/CXX shared library $$@$$(COLOR_NONE)'
-	$(AT)$$($1_CXX) -shared $$($1_TARGET_ARCH) $$^ $$($1_LDFLAGS) -o $$@ $$(GCC_COLOR) \
+	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(GCC_COLOR) \
       && $$(call print_build,Built target $1)
 endef
 
@@ -248,7 +265,7 @@ define executable
 $($1) : $($1_OBJ)
 	$$(make_dir)
 	@echo -e '$$(COLOR_LINK)Linking CXX executable $$@$$(COLOR_NONE)'
-	$(AT)$($1_CXX)  $($1_TARGET_ARCH) $$^ $$($1_LDFLAGS) -o $$@  $$(GCC_COLOR) \
+	$(AT)$($1.CXX)  $($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@  $$(GCC_COLOR) \
       && $$(call print_build,Built target $1)
 endef
 
@@ -256,18 +273,18 @@ endef
 #-----------------------------------------------------------------------
 define file_lists
 
-$1_AR  ?= $(AR)
-$1_AS  ?= $(AS)
-$1_CC  ?= $(CC)
-$1_CXX ?= $(CXX)
-$1_ARFLAGS  ?= $(ARFLAGS)
-$1_CPPFLAGS ?= $(CPPFLAGS)
-$1_CFLAGS   ?= $(CFLAGS)
-$1_CXXFLAGS ?= $(CXXFLAGS)
-$1_LDFLAGS  ?= $(LDFLAGS)
-$1_TARGET_ARCH ?= $(TARGET_ARCH)
-$1_SOURCES ?= $(SOURCES)
-$1_SOURCE_FILES := $(call find_source,$($1_SOURCES))
+$1.AR  ?= $(AR)
+$1.AS  ?= $(AS)
+$1.CC  ?= $(CC)
+$1.CXX ?= $(CXX)
+$1.ARFLAGS  ?= $(ARFLAGS)
+$1.CPPFLAGS ?= $(CPPFLAGS)
+$1.CFLAGS   ?= $(CFLAGS)
+$1.CXXFLAGS ?= $(CXXFLAGS)
+$1.LDFLAGS  ?= $(LDFLAGS)
+$1.TARGET_ARCH ?= $(TARGET_ARCH)
+$1.SOURCES ?= $(SOURCES)
+$1_SOURCE_FILES := $(call find_source,$($1.SOURCES))
 
 endef
 $(eval $(foreach target,$(TARGETS),$(call file_lists,$(target))))
@@ -330,7 +347,7 @@ $($1_DEP_CXX) : $(OUT_DIR)/%.cpp.dep : %.cpp
 	$$(inc_progress)
 	$$(print_dep)
 	$$(save_progress)
-	$(AT)$(CC) $$($1_CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
+	$(AT)$(CC) $$($1.CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
 )
 
 
@@ -339,21 +356,21 @@ $($1_OBJ_AS) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building ASM object $$@)
-	$(AT)$($1_AS) $($1_ASFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
+	$(AT)$($1.AS) $($1.ASFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
 $(if $($1_OBJ_C),
 $($1_OBJ_C) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building C object $$@)
-	$(AT)$($1_CC) $($1_CFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
+	$(AT)$($1.CC) $($1.CFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
 $(if $($1_OBJ_CXX),
 $($1_OBJ_CXX) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$$(make_dir)
 	$$(inc_progress)
 	$$(call print_obj,Building C++ object $$@)
-	$(AT)$($1_CXX) $($1_CXXFLAGS) $($1_CPPFLAGS) $($1_TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
+	$(AT)$($1.CXX) $($1.CXXFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
 $(if $(filter %.a, $($1)),$(call static_lib,$1))
 $(if $(filter %.so,$($1)),$(call shared_lib,$1))
@@ -393,6 +410,9 @@ $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call rules
 
 
 # CHANGELOG ############################################################
+#
+# v2.07
+#     - changed user target variable delimiter from underscore to dot
 #
 # v2.06
 #     - removed deprecated macro MODULES, replaced all occurences with TARGETS
