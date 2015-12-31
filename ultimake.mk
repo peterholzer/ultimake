@@ -1,55 +1,15 @@
 #!/usr/bin/make -f
+# Ultimake
 # Author: Peter Holzer
-# Ultimake v2.07
-# 2014-08-14
+# 2014-08-30
 
-# TODO: call with --warn-undefined-variables
 
-# Environment Variables:
-#   NOCOLOR    if TERM is not defined -> implicitely NOCOLOR
-#   NOPROGRESS
-#   VERBOSE
-#
-
-# TODO: automatically create phony target for each target
-# TODO: support module_CPPFLAGS variable for dependency creation
-
-# TODO:  CFLAGS := -.../x/y
-# TODO:  CFLAGS := -isystem ../x/y keine Warnings für Systembibliotheken
-
-# Recursive Make Considered Harmful, Peter Miller AUUGN 97
-# http://aegis.sourceforge.net/auug97.pdf
-# http://www.conifersystems.com/whitepapers/gnu-make/
-
-# g++ test_obj.o --start-group -lA -lB --end-group -o test
 
 $(info )
-# $(info ULTIMAKE $(CURDIR))
-# $(info ultimake (c) 2014 Peter Holzer)
-
-ifdef ULTIMAKE_NAME
-    $(error it seems you self-included ultimake.)
-endif
-ifdef MODULES
-    $(err Deprecated option $$(MODULES) defined.)
-endif
-ifdef TARGET
-    $(err Deprecated option $$(TARGET) defined.)
-endif
-ifndef TARGETS
-    $(info TARGETS not defined. Creating default target 'main')
-    TARGETS := main
-    main := a.out
-endif
-
-# ifeq (,$(filter $(MAKECMDGOALS),clean clean-all))
-#     NOPROGRESS:=1
-# endif
 
 
-# CC := sleep 0.$$RANDOM; gcc
-
-# Configuration ========================================================
+#-----------------------------------------------------------------------
+# Configuration
 ifndef VERBOSE
     AT := @
 endif
@@ -66,13 +26,14 @@ ULTIMAKE_NAME := $(notdir $(lastword $(MAKEFILE_LIST)))
 # path of this makefile
 ULTIMAKE_PATH := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
-# Default Directories ==================================================
+#-----------------------------------------------------------------------
+# Default Directories
 
 # default values for generated directories
 OUT_DIR ?= debug
 
-
-# TODO: Default Tools ========================================================
+#-----------------------------------------------------------------------
+# TODO: Default Tools
 AR    ?= ar
 CC    ?= gcc
 CXX   ?= g++
@@ -82,54 +43,15 @@ RM    ?= rm -f
 MV    ?= mv -f
 # ARFLAGS ?= r
 
-
-# debug output =========================================================
-print_vars = $(foreach var,$1,$(info $(var) = "$($(var))"   [$(origin $(var))] ))
-
-# print_vars = $(foreach var,$1,@printf "    %10s = %50s [%s]\n" "$(var)" "$($(var))" "\"$(origin $(var))\""  )
-
-.PHONY : print_settings
-
-print_settings:
-	$(info Tools:)
-	$(call print_vars,AR AS CC CXX MKDIR MV RM LD)
-	$(info )
-	$(info Places:)
-	$(call print_vars,OBJDIR DESTDIR srcdir)
-	$(info )
-	$(call print_vars,TARGETS)
-	$(info )
-
-	$(foreach target,$(TARGETS),$(foreach member,.SOURCES _SOURCE_FILES .CPPFLAGS .CFLAGS .CXXFLAGS .LDFLAGS,$(call print_vars,$(target)$(member))) $(info ))
-
-	$(info )
-	$(call print_vars,.LIBPATTERNS)
-
-	$(info )
-	$(info )
-#=======================================================================
-
-
-# Create lists of existing files =======================================
+#-----------------------------------------------------------------------
+# Create lists of existing files
 # find all files in working directory
 # should we exclude all files in OUT_DIR ?
 # executes "find -type f" in several directories and cuts "./" prefix away
-# ALL_FILES := $(patsubst ./%,%,$(foreach dir,$(SOURCES), $(shell find -L $(dir) -type f)))
-
-
-# SOURCE_FILES ?= $(filter %.S %.c %.cpp,$(ALL_FILES))
-
 find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name "*.S" -o -name "*.c" -o -name "*.cpp")))
-# vague_test_SOURCE_FILES := $(call find_source,$(vague_test_SOURCES))
 
-
-
-# create list of dependency and object files from sources
-# and handle folder prefix and file extension
-# DEP := $(patsubst %,$(OUT_DIR)/%.dep,$(SOURCE_FILES))
-# OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $(SOURCE_FILES))
-
-# Colorization for Make and GCC output =================================
+#-----------------------------------------------------------------------
+# Colorization for Make and GCC output
 ifndef NOCOLOR
     ifdef TERM
         COLOR_BUILD := $(shell tput setaf 2)
@@ -171,8 +93,8 @@ ifndef NOCOLOR
     endif
 endif
 
-
-# Show progress percentage =============================================
+#-----------------------------------------------------------------------
+# Show progress percentage
 ifndef NOPROGRESS
     PROGRESS := 0
     PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
@@ -194,17 +116,8 @@ endif
 
 make_dir = $(AT)-$(MKDIR) $(@D)
 
-
-# Phony Targets ========================================================
-
+#-----------------------------------------------------------------------
 .PHONY : all clean run clean-all
-
-
-
-
-
-
-
 
 all : $(foreach t,$(TARGETS), $($t))
 
@@ -219,26 +132,6 @@ clean-all : clean
 
 run : $(main)
 	./$(main)
-
-# Submake Feature ======================================================
-
-LDFLAGS += $(foreach d,$(SUBMAKE_LIBS), -L$(dir $(d)))
-LDFLAGS += $(foreach f,$(SUBMAKE_LIBS), -l$(patsubst lib%.a,%, $(notdir $(f))))
-
-.PHONY : submake
-$(TARGETS) all clean : | submake
-$(TARGETS) : $(SUBMAKE_LIBS) | submake
-
-submake :
-	@for dir in $(SUBMAKE_DIRS); do       \
-        $(MAKE) -C $$dir $(MAKECMDGOALS); \
-    done
-
-$(SUBMAKE_LIBS) : | submake
-
-#=======================================================================
-
-# Rules ################################################################
 
 #-----------------------------------------------------------------------
 # create static library from object files
@@ -289,12 +182,8 @@ $1_SOURCE_FILES := $(call find_source,$($1.SOURCES))
 endef
 $(eval $(foreach target,$(TARGETS),$(call file_lists,$(target))))
 
-# $1_DEP = $$(patsubst %,$$(OUT_DIR)/%.dep,$$($1_SOURCE_FILES))
-# $1_OBJ = $$(patsubst %,$$(OUT_DIR)/%.o,  $$($1_SOURCE_FILES))
-
-
-# Create lists of generated files ======================================
 #-----------------------------------------------------------------------
+# Create lists of generated files
 define file_lists2
 
 $1_DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1_SOURCE_FILES))
@@ -305,8 +194,8 @@ $1_OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1_SOURCE_FILES))
 endef
 $(eval $(foreach target,$(TARGETS),$(call file_lists2,$(target))))
 
-# filter Assembler/C/C++ objects and dependencies
 #-----------------------------------------------------------------------
+# filter Assembler/C/C++ objects and dependencies
 define file_lists3
 
 $1_DEP_AS  := $(filter %.S.dep, $($1_DEP))
@@ -347,7 +236,7 @@ $($1_DEP_CXX) : $(OUT_DIR)/%.cpp.dep : %.cpp
 	$$(inc_progress)
 	$$(print_dep)
 	$$(save_progress)
-	$(AT)$(CC) $$($1.CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
+	$(AT)$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
 )
 
 
@@ -391,133 +280,12 @@ $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_
 $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_lists3,$(target))))
 $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call rules_macro,$(target))))
 
-# Dependency files =====================================================
-# generate dependency files from source files ------------------------
 
 # create assembler files from C source files
 %.s : %.c
 	@echo -e '$(COLOR_GEN)Creating $@$(COLOR_NONE)'
 	$(AT)$(CC) $(CPPFLAGS) $(CFLAGS) -C -S $< -o $@
 
-
-
-
-
-# include $(ULTIMAKE_PATH)/ultimake-help.mk
-# include $(ULTIMAKE_PATH)/dot.mk
-# include $(ULTIMAKE_PATH)/devtools.mk
-# include $(ULTIMAKE_PATH)/gcc-warnings.mk
-
-
-# CHANGELOG ############################################################
-#
-# v2.07
-#     - changed user target variable delimiter from underscore to dot
-#
-# v2.06
-#     - removed deprecated macro MODULES, replaced all occurences with TARGETS
-#     - removed TARGET (without S)
-#
-# v2.05
-#     - fixed include path orders for dependency generation
-#
-# v2.04
-#     - removed "_TARGET" suffix from target variable
-#
-# v2.03
-#     -
-#
-# v2.02
-#     - replaced ULTIMAKE_NOCOLOR with NOCOLOR, ULTIMAKE_NOPROGRESS with NOPROGRESS
-#
-# v2.00
-#     - introduced MODULE system
-#
-# v1.31-v1.33
-#     - replaced BIN and LIB completely with TARGET
-#
-# v1.30
-#     - fixed percentage (missing comma in function call, v1.29, line 134)
-#     - added sed command to colorize gcc output
-#
-# v1.29
-#     - fixed unwanted rebuilding of dependencies when target 'clean' is called repeatedly,
-#       found solition in GNU make manual 9.2 ;-)
-#     - renamed DEBUG variable to VERBOSE
-#
-# v1.28
-#     - introduced progress percentage
-#     - replaced all XXX_SRC variables with SOURCE_FILES
-#     - commented out submake-feature
-#     - simplified "find" of source files
-#
-# v1.27
-#
-# v1.26
-#     - removed vala support and put it in ultimake-vala.mk
-#     - removed CPPFLAGS_INC. Additional include directories in INCLUDES are
-#       now part of CPPFLAGS. Dependency generation now uses CPPFLAGS.
-#     - changed self-include-check to watch out for ULTIMAKE_NAME instead
-#       of ULTIMAKES_SELF_INCLUDE_STOP
-#
-# v1.25
-#     - removed old crap (comments, ...)
-#
-#
-# v1.24
-#     - cleaned up
-#     - OUT_DIR is now useless. Output path is set by DEP_DIR, OBJ_DIR, ... and TARGET
-#
-# v1.23
-#     - ultimake now handles TARGET autmatically as static
-#       library when it is named lib*.a
-#   ( - removed precompiled headers )
-#
-# v1.22
-#     - partially added precompiled headers
-#
-# v1.21
-#     - added -L to find command to find symlinks
-#
-# v1.19
-#     - deleted dead code
-#
-# v1.18
-#     - reintroduced OUT_DIR
-#
-# v1.17
-#
-# v1.16
-#
-# v1.15
-#     - refactored creation of file lists
-#     - include order statement from v1.14 is wrong
-#
-# v1.14
-#     - corrected include order. include statements are now after all
-#       rules, because otherwise all included files will be built
-#       BEFORE the target is executed
-#     - removed target clean-all
-#     - refactored help and tools target
-#
-# v1.13
-#     - divided directories for object files and dependencies
-#     - replaced OUT_DIR with DEP_DIR and OBJ_DIR
-#     - new directories for vala-generated c files
-#     - new default locations (hidden, start with dot)
-#     - binaries and libs are no more tied to the object folder
-#
-# v1.12
-#     - introduced FILES
-#
-# v1.10
-#     - refactoring
-#     - replaced make wildcards with shell find
-#     - removed subdirs/modules
-#
-# v1.09
-#     - added logging functionality
-#
 
 
 
