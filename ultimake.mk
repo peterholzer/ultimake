@@ -67,34 +67,6 @@ clean :
 	$(AT)-$(RM) $(foreach t,$(TARGETS), $($t) $($t_OBJ) $($t_DEP))
 
 
-#-----------------------------------------------------------------------
-# create static library from object files
-define static_lib
-$($1) : $($1_OBJ)
-	$(make_dir)
-	$(AT)$(RM) $$@
-	@echo -e '$$(COLOR_LINK)Linking C/CXX static library $$@$$(COLOR_NONE)'
-	$(AT)$($1.AR) $($1.ARFLAGS) $$@ $$^ \
-      && $$(call print_build,Built target $1)
-endef
-
-# create shared library from object files
-define shared_lib
-$($1) : $($1_OBJ)
-	$(make_dir)
-	@echo -e '$$(COLOR_LINK)Linking C/CXX shared library $$@$$(COLOR_NONE)'
-	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(GCC_COLOR) \
-      && $$(call print_build,Built target $1)
-endef
-
-# link object files into binary
-define executable
-$($1) : $($1_OBJ)
-	$(make_dir)
-	@echo -e '$$(COLOR_LINK)Linking CXX executable $$@$$(COLOR_NONE)'
-	$(AT)$($1.CXX)  $($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@  $$(GCC_COLOR) \
-      && $$(call print_build,Built target $1)
-endef
 
 #-----------------------------------------------------------------------
 define file_lists
@@ -145,10 +117,41 @@ $(eval $(foreach target,$(TARGETS),$(call file_lists3,$(target))))
 
 print_dep = @printf '$(COLOR_DEP)Scanning dependencies of target$(COLOR_NONE) $@ \n'
 print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
-print_build = printf '$1\n'
+print_build = printf 'Built target $@\n'
 
 
 -include $(ULTIMAKE_PATH)/ultimake-fancy.mk
+
+
+
+
+
+#-----------------------------------------------------------------------
+# create static library from object files
+define static_lib
+$($1) : $($1_OBJ)
+	$(make_dir)
+	$(AT)$(RM) $$@
+	@echo -e '$$(COLOR_LINK)Linking C/CXX static library $$@$$(COLOR_NONE)'
+	$(AT)$($1.AR) $($1.ARFLAGS) $$@ $$^ && $$(print_build)
+endef
+
+# create shared library from object files
+define shared_lib
+$($1) : $($1_OBJ)
+	$(make_dir)
+	@echo -e '$$(COLOR_LINK)Linking C/CXX shared library $$@$$(COLOR_NONE)'
+	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(GCC_COLOR) && $$(print_build)
+endef
+
+# link object files into binary
+define executable
+$($1) : $($1_OBJ)
+	$(make_dir)
+	@echo -e '$$(COLOR_LINK)Linking CXX executable $$@$$(COLOR_NONE)'
+	$(AT)$($1.CXX)  $($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@  $$(GCC_COLOR) && $$(print_build)
+endef
+
 
 #-----------------------------------------------------------------------
 define rules_macro

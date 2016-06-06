@@ -7,12 +7,14 @@ ifdef TERM
         COLOR_LINK  := $(shell tput setaf 1)$(shell tput bold)
         COLOR_DEP   := $(shell tput setaf 5)$(shell tput bold)
         COLOR_GEN   := $(shell tput setaf 4)$(shell tput bold)
+        COLOR_NONE  := $(shell tput sgr0)
+    endif
+
+    ifdef GCC_OUTPUT_COLORIZATION
+        # colorize gcc output and set exit code 1 if "error:" is found
         COLOR_WARN  := $(shell tput setaf 1)
         COLOR_NOTE  := $(shell tput setaf 3)
         COLOR_ERR   := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
-        COLOR_NONE  := $(shell tput sgr0)
-
-        # colorize gcc output and set exit code 1 if "error:" is found
         define GCC_COLOR :=
             2>&1 1>/dev/null | awk '  \
               {                       \
@@ -22,6 +24,7 @@ ifdef TERM
                 print                 \
               }                       \
               END{exit err}'  >&2
+
         endef
     endif
 
@@ -50,7 +53,7 @@ ifdef TERM
             $(inc_progress)
             @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
         endef
-        print_build = printf '[%3s%%] $1\n'                            '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
+        print_build = printf '[%3s%%] Built target $@\n'                            '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
     endif
 
 endif
