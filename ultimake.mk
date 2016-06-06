@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Ultimake
 # Author: Peter Holzer
-# 2014-08-30
+# License: MIT
 
 
 
@@ -47,15 +47,8 @@ MV    ?= mv -f
 # find all files in working directory
 # should we exclude all files in OUT_DIR ?
 # executes "find -type f" in several directories and cuts "./" prefix away
-find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -name "*.S" -o -name "*.c" -o -name "*.cpp")))
+find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -iname "*.S" -o -iname "*.c" -o -iname "*.cpp")))
 
-
-print_dep := @printf '$(COLOR_DEP)Scanning dependencies of target $$@$(COLOR_NONE)\n'
-print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
-print_build = printf '$1\n'
-
-
-include $(ULTIMAKE_PATH)/ultimake-fancy.mk
 
 
 
@@ -107,7 +100,7 @@ $($1) : $($1_OBJ)
       && $$(call print_build,Built target $1)
 endef
 
-
+# todo obj und dep ordnen in file_lists und file_lists2.... für print_dep
 #-----------------------------------------------------------------------
 define file_lists
 
@@ -217,6 +210,16 @@ endef
 $(eval $(foreach target,$(TARGETS),$(call rules_macro,$(target))))
 
 #-----------------------------------------------------------------------
+
+
+print_dep = @printf '$(COLOR_DEP)Scanning dependencies of target$(COLOR_NONE) $@ \n'
+print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
+print_build = printf '$1\n'
+
+
+include $(ULTIMAKE_PATH)/ultimake-fancy.mk
+
+
 
 $(shell mkdir -p $(OUT_DIR))
 $(file > $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_lists,$(target))))
