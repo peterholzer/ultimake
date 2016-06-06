@@ -1,5 +1,5 @@
 
-    ifdef TERM
+ifdef TERM
     #-----------------------------------------------------------------------
     # Colorization for Make and GCC output
     ifndef NOCOLOR
@@ -31,21 +31,26 @@
     ifndef NOPROGRESS
         TERM_CURSOR_UP := $(shell tput cuu1)
         NUM_OBJ := $(words $(foreach target,$(TARGETS), $($(target)_SOURCE_FILES)))
-        $(info $(NUM_OBJ))
         PROGRESS := 0
         PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
-        PROGRESS_MAX = $(shell cat $(PROGRESS_FILE))
         inc_progress  = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc))
         save_progress = @echo -n $(PROGRESS) > $(PROGRESS_FILE);
-        print_dep = @printf '$(TERM_CURSOR_UP)$(COLOR_DEP)Scanning dependencies... [$(PROGRESS)/$(NUM_OBJ)]\n';
-    #     print_dep = @printf '\r$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE) [$(PROGRESS)/$(words $(OBJ))]';
 
     # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
         percentage = $(shell echo $(1)00/$(2) | bc)
-    #     percentage = $(shell echo $(1)00/$(2) | bc) | $(shell echo $(1)/$(2))
-        print_obj   = @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
-        print_build = printf '[%3s%%] $1\n'                            '$(call percentage,$(PROGRESS),$(PROGRESS_MAX))'
-    # else
+        percentage = $(1)/$(2)
+
+        define print_dep =
+            $(inc_progress)
+            @printf '$(TERM_CURSOR_UP)$(COLOR_DEP)Scanning dependencies...$(COLOR_NONE) [$(PROGRESS)/$(NUM_OBJ)]\n';
+            $(save_progress)
+        endef
+
+        define print_obj =
+            $(inc_progress)
+            @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
+        endef
+        print_build = printf '[%3s%%] $1\n'                            '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
     endif
 
 endif

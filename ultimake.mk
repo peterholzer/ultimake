@@ -47,7 +47,9 @@ MV    ?= mv -f
 # find all files in working directory
 # should we exclude all files in OUT_DIR ?
 # executes "find -type f" in several directories and cuts "./" prefix away
-find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -iname "*.S" -o -iname "*.c" -o -iname "*.cpp")))
+find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -iname "*.S"\
+                                                                       -o -iname "*.c"\
+                                                                       -o -iname "*.cpp")))
 
 
 
@@ -55,7 +57,7 @@ find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -iname
 make_dir = $(AT)-$(MKDIR) $$(@D)
 
 #-----------------------------------------------------------------------
-.PHONY : all clean run clean-all
+.PHONY : all clean
 
 all : $(foreach t,$(TARGETS), $($t))
 
@@ -64,12 +66,6 @@ clean :
 # 	$(AT)-$(RM) $(TARGETS) $(OBJ) $(DEP)
 	$(AT)-$(RM) $(foreach t,$(TARGETS), $($t) $($t_OBJ) $($t_DEP))
 
-clean-all : clean
-	@echo 'Cleaning, really ...'
-	$(AT)-$(shell find $(OUT_DIR) -name "*.dep" -delete -o -name "*.o" -delete)
-
-run : $(main)
-	./$(main)
 
 #-----------------------------------------------------------------------
 # create static library from object files
@@ -100,7 +96,6 @@ $($1) : $($1_OBJ)
       && $$(call print_build,Built target $1)
 endef
 
-# todo obj und dep ordnen in file_lists und file_lists2.... für print_dep
 #-----------------------------------------------------------------------
 define file_lists
 
@@ -145,6 +140,16 @@ $1_OBJ_CXX := $(filter %.cpp.o, $($1_OBJ))
 endef
 $(eval $(foreach target,$(TARGETS),$(call file_lists3,$(target))))
 
+
+#-----------------------------------------------------------------------
+
+print_dep = @printf '$(COLOR_DEP)Scanning dependencies of target$(COLOR_NONE) $@ \n'
+print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
+print_build = printf '$1\n'
+
+
+-include $(ULTIMAKE_PATH)/ultimake-fancy.mk
+
 #-----------------------------------------------------------------------
 define rules_macro
 
@@ -154,25 +159,19 @@ $1 : $($1)
 $(if $($1_DEP_AS),
 $($1_DEP_AS) : $(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
-	$$(inc_progress)
 	$$(print_dep)
-	$$(save_progress)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.S=%.S.o)" $$<
 )
 $(if $($1_DEP_C),
 $($1_DEP_C) : $(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
-	$$(inc_progress)
 	$$(print_dep)
-	$$(save_progress)
 	$(AT)$(CC) $(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.c=%.c.o)" $$<
 )
 $(if $($1_DEP_CXX),
 $($1_DEP_CXX) : $(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
-	$$(inc_progress)
 	$$(print_dep)
-	$$(save_progress)
 	$(AT)$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
 )
 
@@ -180,21 +179,18 @@ $($1_DEP_CXX) : $(OUT_DIR)/%.cpp.dep : %.cpp
 $(if $($1_OBJ_AS),
 $($1_OBJ_AS) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$(make_dir)
-	$$(inc_progress)
 	$$(call print_obj,Building ASM object $$@)
 	$(AT)$($1.AS) $($1.ASFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
 $(if $($1_OBJ_C),
 $($1_OBJ_C) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$(make_dir)
-	$$(inc_progress)
 	$$(call print_obj,Building C object $$@)
 	$(AT)$($1.CC) $($1.CFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
 $(if $($1_OBJ_CXX),
 $($1_OBJ_CXX) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$(make_dir)
-	$$(inc_progress)
 	$$(call print_obj,Building C++ object $$@)
 	$(AT)$($1.CXX) $($1.CXXFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
 )
@@ -210,14 +206,6 @@ endef
 $(eval $(foreach target,$(TARGETS),$(call rules_macro,$(target))))
 
 #-----------------------------------------------------------------------
-
-
-print_dep = @printf '$(COLOR_DEP)Scanning dependencies of target$(COLOR_NONE) $@ \n'
-print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
-print_build = printf '$1\n'
-
-
-include $(ULTIMAKE_PATH)/ultimake-fancy.mk
 
 
 
