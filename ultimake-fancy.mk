@@ -10,25 +10,6 @@ ifdef TERM
         COLOR_NONE  := $(shell tput sgr0)
     endif
 
-    ifdef GCC_OUTPUT_COLORIZATION
-        # colorize gcc output and set exit code 1 if "error:" is found
-        COLOR_WARN  := $(shell tput setaf 1)
-        COLOR_NOTE  := $(shell tput setaf 3)
-        COLOR_ERR   := $(shell tput setaf 7)$(shell tput setab 1)$(shell tput bold)
-        define GCC_COLOR :=
-            2>&1 1>/dev/null | awk '  \
-              {                       \
-                if(sub("^.*error:.*", "$(COLOR_ERR)&$(COLOR_NONE)")) {err=1} \
-                sub("^.*warning:.*", "$(COLOR_WARN)&$(COLOR_NONE)");         \
-                sub("^.*note:.*",    "$(COLOR_NOTE)&$(COLOR_NONE)");         \
-                print                 \
-              }                       \
-              END{exit err}'  >&2
-
-        endef
-    endif
-
-
     #-----------------------------------------------------------------------
     # Show progress percentage
     ifndef NOPROGRESS

@@ -141,7 +141,7 @@ define shared_lib
 $($1) : $($1_OBJ)
 	$(make_dir)
 	@echo -e '$$(COLOR_LINK)Linking C/CXX shared library $$@$$(COLOR_NONE)'
-	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(GCC_COLOR) && $$(print_build)
+	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ && $$(print_build)
 endef
 
 # link object files into binary
@@ -149,7 +149,7 @@ define executable
 $($1) : $($1_OBJ)
 	$(make_dir)
 	@echo -e '$$(COLOR_LINK)Linking CXX executable $$@$$(COLOR_NONE)'
-	$(AT)$($1.CXX)  $($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@  $$(GCC_COLOR) && $$(print_build)
+	$(AT)$($1.CXX)  $($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ && $$(print_build)
 endef
 
 
@@ -183,19 +183,19 @@ $(if $($1_OBJ_AS),
 $($1_OBJ_AS) : $(OUT_DIR)/%.S.o : %.S $(OUT_DIR)/%.S.dep
 	$(make_dir)
 	$$(call print_obj,Building ASM object $$@)
-	$(AT)$($1.AS) $($1.ASFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
+	$(AT)$($1.AS) $($1.ASFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@
 )
 $(if $($1_OBJ_C),
 $($1_OBJ_C) : $(OUT_DIR)/%.c.o : %.c $(OUT_DIR)/%.c.dep
 	$(make_dir)
 	$$(call print_obj,Building C object $$@)
-	$(AT)$($1.CC) $($1.CFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
+	$(AT)$($1.CC) $($1.CFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@
 )
 $(if $($1_OBJ_CXX),
 $($1_OBJ_CXX) : $(OUT_DIR)/%.cpp.o : %.cpp $(OUT_DIR)/%.cpp.dep
 	$(make_dir)
 	$$(call print_obj,Building C++ object $$@)
-	$(AT)$($1.CXX) $($1.CXXFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@ $(GCC_COLOR)
+	$(AT)$($1.CXX) $($1.CXXFLAGS) $($1.CPPFLAGS) $($1.TARGET_ARCH) -c $$< -o $$@
 )
 $(if $(filter %.a, $($1)),$(call static_lib,$1))
 $(if $(filter %.so,$($1)),$(call shared_lib,$1))
