@@ -39,7 +39,6 @@ CC    ?= gcc
 CXX   ?= g++
 MKDIR ?= mkdir -p
 RM    ?= rm -f
-# RM    := echo rm -f
 MV    ?= mv -f
 # ARFLAGS ?= r
 
@@ -112,6 +111,7 @@ ifndef NOPROGRESS
 else
     print_dep := @printf '$(COLOR_DEP)Scanning dependencies of target $(TARGET)$(COLOR_NONE)\n'
     print_obj = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
+    print_build = printf '$1\n'
 endif
 
 make_dir = $(AT)-$(MKDIR) $(@D)
