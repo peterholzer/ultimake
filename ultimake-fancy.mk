@@ -38,7 +38,7 @@ ifdef TERM
 
     # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50 (%)
         percentage = $(shell echo $(1)00/$(2) | bc)
-        percentage = $(1)/$(2)
+#         percentage = $(1)/$(2)
 
         define print_dep =
             $(inc_progress)
