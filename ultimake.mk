@@ -54,8 +54,6 @@ find_source = $(patsubst ./%,%,$(foreach dir,$(1), $(shell find -L $(dir) -iname
 
 make_dir = $(AT)-$(MKDIR) $$(@D)
 
-
-
 #-----------------------------------------------------------------------
 define tool_list
 
@@ -151,47 +149,44 @@ endef
 #-----------------------------------------------------------------------
 define rules_macro
 
+
 .PHONY : $1
 $1 : $($1)
 
-$(if $($1_DEP_AS),
+$(if $(filter %.a, $($1)),$(call static_lib,$1)
+)$(if $(filter %.so,$($1)),$(call shared_lib,$1)
+)$(if $(filter-out %.a %.so,$($1)),$(call executable,$1)
+)$(if $($1_DEP_AS),
 $($1_DEP_AS) : $$(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$$(print_dep)
-	$(AT)$$(CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$$(OUT_DIR)/$(<:%.S=%.S.o)" $$<)
-$(if $($1_DEP_C),
+	$(AT)$$(CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$$(OUT_DIR)/$(<:%.S=%.S.o)" $$<
+)$(if $($1_DEP_C),
 $($1_DEP_C) : $$(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
 	$$(print_dep)
-	$(AT)$$(CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$$(OUT_DIR)/$(<:%.c=%.c.o)" $$<)
-$(if $($1_DEP_CXX),
+	$(AT)$$(CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$$(OUT_DIR)/$(<:%.c=%.c.o)" $$<
+)$(if $($1_DEP_CXX),
 $($1_DEP_CXX) : $$(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
 	$$(print_dep)
-	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<)
-
-
-$(if $($1_OBJ_AS),
+	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" -MT"$$(OUT_DIR)/$(<:%.cpp=%.cpp.o)" $$<
+)$(if $($1_OBJ_AS),
 $($1_OBJ_AS) : $$(OUT_DIR)/%.S.o : %.S $$(OUT_DIR)/%.S.dep
 	$(make_dir)
 	$$(call print_obj,Building ASM object $$@)
 	$(AT)$$($1.AS) $$($1.ASFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-)
-$(if $($1_OBJ_C),
+)$(if $($1_OBJ_C),
 $($1_OBJ_C) : $$(OUT_DIR)/%.c.o : %.c $$(OUT_DIR)/%.c.dep
 	$(make_dir)
 	$$(call print_obj,Building C object $$@)
 	$(AT)$$($1.CC) $$($1.CFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-)
-$(if $($1_OBJ_CXX),
+)$(if $($1_OBJ_CXX),
 $($1_OBJ_CXX) : $$(OUT_DIR)/%.cpp.o : %.cpp $$(OUT_DIR)/%.cpp.dep
 	$(make_dir)
 	$$(call print_obj,Building C++ object $$@)
 	$(AT)$$($1.CXX) $$($1.CXXFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
 )
-$(if $(filter %.a, $($1)),$(call static_lib,$1))
-$(if $(filter %.so,$($1)),$(call shared_lib,$1))
-$(if $(filter-out %.a %.so,$($1)),$(call executable,$1))
 $(if $(filter clean,$(MAKECMDGOALS)),,-include $($1_DEP))
 
 endef
@@ -200,15 +195,9 @@ $(eval $(foreach t,$(TARGETS),$(call rules_macro,$t)))
 #-----------------------------------------------------------------------
 
 
-
 $(shell mkdir -p $(OUT_DIR))
 $(file > $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call tool_list,$(target))))
-# $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_list1,$(target))))
-# $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call file_list2,$(target))))
 $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call rules_macro,$(target))))
-
-
-# $(foreach target,$(TARGETS),$(shell cat $($(target)_DEP)))
 
 # create assembler files from C source files
 %.s : %.c
