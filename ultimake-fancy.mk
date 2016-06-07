@@ -34,7 +34,7 @@ ifdef TERM
             $(inc_progress)
             @printf '[%3s%%] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
         endef
-        print_build = printf '[%3s%%] Built target $@\n'                            '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
+        print_build = printf '[%3s%%] Built target $@\n' '$(call percentage,$(PROGRESS),$(NUM_OBJ))'
     endif
 
 endif
