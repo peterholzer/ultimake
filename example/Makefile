@@ -42,15 +42,22 @@ libBar.SOURCES  = ./lib/libbar/
 libBar.INCLUDE  = -I./lib/libbar/
 libBar.CPPFLAGS = $(libBar.INCLUDE)
 
+TARGETS += libAss
+libAss   = ./lib/libass.a
+libAss.SOURCES  = ./lib/libass/
+libAss.INCLUDE  = -I./lib/libass/
+libAss.CPPFLAGS = $(libAss.INCLUDE)
+
 
 TARGETS += App1
 App1     = App1.bin
 App1.SOURCES  = src/
-App1.CPPFLAGS = -I./lib/ $(libFoo.INCLUDE) $(libBar.INCLUDE)
+App1.CPPFLAGS = -I./lib/ $(libFoo.INCLUDE) $(libBar.INCLUDE) $(libAss.INCLUDE)
 App1.LDFLAGS  = -L.
 #App1.CC  =
 #App1.CXX =
 #App1.LD  =
+
 
 # print build commands
 VERBOSE := 1
@@ -60,4 +67,4 @@ VERBOSE := 1
 include ../ultimake.mk
 
 # will link App1 to libFoo.a and libBar.a
-$(App1) : $(libFoo) $(libBar)
+$(App1) : $(libFoo) $(libBar) $(libAss)
