@@ -81,7 +81,7 @@ $1.CXXFLAGS ?= $$(CXXFLAGS)
 $1.LDFLAGS  ?= $$(LDFLAGS)
 $1.TARGET_ARCH  ?= $$(TARGET_ARCH)
 $1.SOURCES      ?= $$(SOURCES)
-$1_SOURCE_FILES := $$(call find_source,$($1.SOURCES))
+$1.SOURCE_FILES := $$(call find_source,$($1.SOURCES))
 
 endef
 $(eval $(foreach target,$(TARGETS),$(call tool_list,$(target))))
@@ -90,8 +90,8 @@ $(eval $(foreach target,$(TARGETS),$(call tool_list,$(target))))
 # Create lists of generated files
 define file_list1
 
-$1_DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1_SOURCE_FILES))
-$1_OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1_SOURCE_FILES))
+$1.DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1.SOURCE_FILES))
+$1.OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1.SOURCE_FILES))
 
 endef
 $(eval $(foreach target,$(TARGETS),$(call file_list1,$(target))))
@@ -100,12 +100,12 @@ $(eval $(foreach target,$(TARGETS),$(call file_list1,$(target))))
 # filter Assembler/C/C++ objects and dependencies
 define file_list2
 
-$1_DEP_AS  := $(filter %.S.dep, $($1_DEP))
-$1_DEP_C   := $(filter %.c.dep, $($1_DEP))
-$1_DEP_CXX := $(filter %.cpp.dep, $($1_DEP))
-$1_OBJ_AS  := $(filter %.S.o, $($1_OBJ))
-$1_OBJ_C   := $(filter %.c.o, $($1_OBJ))
-$1_OBJ_CXX := $(filter %.cpp.o, $($1_OBJ))
+$1.DEP_AS  := $(filter %.S.dep, $($1.DEP))
+$1.DEP_C   := $(filter %.c.dep, $($1.DEP))
+$1.DEP_CXX := $(filter %.cpp.dep, $($1.DEP))
+$1.OBJ_AS  := $(filter %.S.o, $($1.OBJ))
+$1.OBJ_C   := $(filter %.c.o, $($1.OBJ))
+$1.OBJ_CXX := $(filter %.cpp.o, $($1.OBJ))
 
 endef
 $(eval $(foreach target,$(TARGETS),$(call file_list2,$(target))))
@@ -114,9 +114,9 @@ $(eval $(foreach target,$(TARGETS),$(call file_list2,$(target))))
 #-----------------------------------------------------------------------
 
 ULTIMAKE.PREDEPENDENCY   = @printf '$(COLOR_DEP)Creating dependencies of target$(COLOR_NONE) $@ \n'
-ULTIMAKE.POSTDEPENDENCY :=
+# ULTIMAKE.POSTDEPENDENCY  =
 ULTIMAKE.PRECOMPILE      = @printf '$(COLOR_BUILD)$1$(COLOR_NONE)\n'
-ULTIMAKE.POSTCOMPILE    :=
+# ULTIMAKE.POSTCOMPILE     = || $(RM) $(@:%.o:%.dep)
 ULTIMAKE.PRELINK         = @printf '$(COLOR_LINK)$1$(COLOR_NONE)\n'
 ULTIMAKE.POSTLINK        = && printf 'Built target $@\n'
 
@@ -129,13 +129,13 @@ all : $(foreach target,$(TARGETS), $($(target)))
 
 clean :
 	@echo 'Cleaning ...'
-	$(AT)-$(RM) $(foreach target, $(TARGETS), $($(target)) $($(target)_OBJ) $($(target)_DEP))
+	$(AT)-$(RM) $(foreach target, $(TARGETS), $($(target)) $($(target).OBJ) $($(target).DEP))
 
 
 #-----------------------------------------------------------------------
 # create static library from object files
 define static_lib
-$($1) : $($1_OBJ)
+$($1) : $($1.OBJ)
 	$(make_dir)
 	$(AT)$(RM) $$@
 	$(call ULTIMAKE.PRELINK,Linking C/CXX static library $$@)
@@ -144,7 +144,7 @@ endef
 
 # create shared library from object files
 define shared_lib
-$($1) : $($1_OBJ)
+$($1) : $($1.OBJ)
 	$(make_dir)
 	$(call ULTIMAKE.PRELINK,Linking C/CXX shared library $$@)
 	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(ULTIMAKE.POSTLINK)
@@ -152,7 +152,7 @@ endef
 
 # link object files into binary
 define executable
-$($1) : $($1_OBJ)
+$($1) : $($1.OBJ)
 	$(make_dir)
 	$(call ULTIMAKE.PRELINK,Linking CXX executable $$@)
 	$(AT)$$($1.CXX)  $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(ULTIMAKE.POSTLINK)
@@ -169,44 +169,38 @@ $1 : $($1)
 $(if $(filter %.a, $($1)),$(call static_lib,$1)
 )$(if $(filter %.so,$($1)),$(call shared_lib,$1)
 )$(if $(filter-out %.a %.so,$($1)),$(call executable,$1)
-)$(if $($1_DEP_AS),
-$($1_DEP_AS) : $$(OUT_DIR)/%.S.dep : %.S
+)$(if $($1.DEP_AS),
+$($1.DEP_AS) : $$(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
-	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$<
-	$$(ULTIMAKE.POSTDEPENDENCY)
-)$(if $($1_DEP_C),
-$($1_DEP_C) : $$(OUT_DIR)/%.c.dep : %.c
+	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $$(ULTIMAKE.POSTDEPENDENCY)
+)$(if $($1.DEP_C),
+$($1.DEP_C) : $$(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
-	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$<
-	$$(ULTIMAKE.POSTDEPENDENCY)
-)$(if $($1_DEP_CXX),
-$($1_DEP_CXX) : $$(OUT_DIR)/%.cpp.dep : %.cpp
+	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $$(ULTIMAKE.POSTDEPENDENCY)
+)$(if $($1.DEP_CXX),
+$($1.DEP_CXX) : $$(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
-	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$<
-	$(ULTIMAKE.POSTDEPENDENCY)
-)$(if $($1_OBJ_AS),
-$($1_OBJ_AS) : $$(OUT_DIR)/%.S.o : %.S $$(OUT_DIR)/%.S.dep
+	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $(ULTIMAKE.POSTDEPENDENCY)
+)$(if $($1.OBJ_AS),
+$($1.OBJ_AS) : $$(OUT_DIR)/%.S.o : %.S $$(OUT_DIR)/%.S.dep
 	$(make_dir)
-	$$(call ULTIMAKE.PRECOMPILE,Building ASM object $$@)
-	$(AT)$$($1.AS) $$($1.ASFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-	$$(ULTIMAKE.POSTCOMPILE)
-)$(if $($1_OBJ_C),
-$($1_OBJ_C) : $$(OUT_DIR)/%.c.o : %.c $$(OUT_DIR)/%.c.dep
+	$(call ULTIMAKE.PRECOMPILE,Building ASM object $$@)
+	$(AT)$$($1.AS) $$($1.ASFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
+)$(if $($1.OBJ_C),
+$($1.OBJ_C) : $$(OUT_DIR)/%.c.o : %.c $$(OUT_DIR)/%.c.dep
 	$(make_dir)
-	$$(call ULTIMAKE.PRECOMPILE,Building C object $$@)
-	$(AT)$$($1.CC) $$($1.CFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-	$$(ULTIMAKE.POSTCOMPILE)
-)$(if $($1_OBJ_CXX),
-$($1_OBJ_CXX) : $$(OUT_DIR)/%.cpp.o : %.cpp $$(OUT_DIR)/%.cpp.dep
+	$(call ULTIMAKE.PRECOMPILE,Building C object $$@)
+	$(AT)$$($1.CC) $$($1.CFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
+)$(if $($1.OBJ_CXX),
+$($1.OBJ_CXX) : $$(OUT_DIR)/%.cpp.o : %.cpp $$(OUT_DIR)/%.cpp.dep
 	$(make_dir)
-	$$(call ULTIMAKE.PRECOMPILE,Building C++ object $$@)
-	$(AT)$$($1.CXX) $$($1.CXXFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-	$$(ULTIMAKE.POSTCOMPILE)
+	$(call ULTIMAKE.PRECOMPILE,Building C++ object $$@)
+	$(AT)$$($1.CXX) $$($1.CXXFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )
-$(if $(filter clean,$(MAKECMDGOALS)),,-include $($1_DEP))
+$(if $(filter clean,$(MAKECMDGOALS)),,-include $($1.DEP))
 
 endef
 $(eval $(foreach t,$(TARGETS),$(call rules_macro,$t)))
