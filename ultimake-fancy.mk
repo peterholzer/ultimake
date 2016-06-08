@@ -8,12 +8,12 @@ ifdef TERM
         COLOR_GEN   := $(shell tput setaf 4)$(shell tput bold)
         COLOR_NONE  := $(shell tput sgr0)
     endif
+    TERM_CURSOR_UP := $(shell tput cuu1)
 endif
 
     #-----------------------------------------------------------------------
     # Show progress percentage
     ifndef NOPROGRESS
-        TERM_CURSOR_UP := $(shell tput cuu1)
         NUM_OF_SOURCES := $(words $(foreach target,$(TARGETS), $($(target).SOURCE_FILES)))
         PROGRESS := 0
         PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
@@ -32,10 +32,9 @@ endif
         ULTIMAKE.POSTDEPENDENCY =
 
         define ULTIMAKE.PRECOMPILE =
-             $(inc_progress) \
              @printf '[%3s] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(load_progress))'
         endef
-        ULTIMAKE.POSTCOMPILE =
+        ULTIMAKE.POSTCOMPILE = $(inc_progress)
 
         ULTIMAKE.PRELINK  = @printf '$(COLOR_LINK)$1$(COLOR_NONE)\n'
         ULTIMAKE.POSTLINK = && printf '[%3s] Built target $@\n' '$(call percentage,$(PROGRESS),$(load_progress))'

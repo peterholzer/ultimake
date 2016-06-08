@@ -81,7 +81,7 @@ $1.CXXFLAGS ?= $$(CXXFLAGS)
 $1.LDFLAGS  ?= $$(LDFLAGS)
 $1.TARGET_ARCH  ?= $$(TARGET_ARCH)
 $1.SOURCES      ?= $$(SOURCES)
-$1.SOURCE_FILES := $$(call find_source,$($1.SOURCES))
+$1.SOURCE_FILES := $(call find_source,$($1.SOURCES))
 
 endef
 $(eval $(foreach target,$(TARGETS),$(call tool_list,$(target))))
@@ -173,38 +173,32 @@ $(if $(filter %.a, $($1)),$(call static_lib,$1)
 $($1.DEP_AS) : $$(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
-	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$<
-# 	$$(ULTIMAKE.POSTDEPENDENCY)
+	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $$(ULTIMAKE.POSTDEPENDENCY)
 )$(if $($1.DEP_C),
 $($1.DEP_C) : $$(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
-	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$<
-# 	$$(ULTIMAKE.POSTDEPENDENCY)
+	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $$(ULTIMAKE.POSTDEPENDENCY)
 )$(if $($1.DEP_CXX),
 $($1.DEP_CXX) : $$(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
-	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$<
-# 	$(ULTIMAKE.POSTDEPENDENCY)
+	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $(ULTIMAKE.POSTDEPENDENCY)
 )$(if $($1.OBJ_AS),
 $($1.OBJ_AS) : $$(OUT_DIR)/%.S.o : %.S $$(OUT_DIR)/%.S.dep
 	$(make_dir)
 	$$(call ULTIMAKE.PRECOMPILE,Building ASM object $$@)
-	$(AT)$$($1.AS) $$($1.ASFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-# 	$$(ULTIMAKE.POSTCOMPILE)
+	$(AT)$$($1.AS) $$($1.ASFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )$(if $($1.OBJ_C),
 $($1.OBJ_C) : $$(OUT_DIR)/%.c.o : %.c $$(OUT_DIR)/%.c.dep
 	$(make_dir)
 	$$(call ULTIMAKE.PRECOMPILE,Building C object $$@)
-	$(AT)$$($1.CC) $$($1.CFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-# 	$$(ULTIMAKE.POSTCOMPILE)
+	$(AT)$$($1.CC) $$($1.CFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )$(if $($1.OBJ_CXX),
 $($1.OBJ_CXX) : $$(OUT_DIR)/%.cpp.o : %.cpp $$(OUT_DIR)/%.cpp.dep
 	$(make_dir)
 	$$(call ULTIMAKE.PRECOMPILE,Building C++ object $$@)
-	$(AT)$$($1.CXX) $$($1.CXXFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@
-# 	$$(ULTIMAKE.POSTCOMPILE)
+	$(AT)$$($1.CXX) $$($1.CXXFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )
 $(if $(filter clean,$(MAKECMDGOALS)),,-include $($1.DEP))
 
