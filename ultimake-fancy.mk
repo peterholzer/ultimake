@@ -34,7 +34,8 @@ endif
         define ULTIMAKE.PRECOMPILE =
              @printf '[%3s] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(load_progress))'
         endef
-        ULTIMAKE.POSTCOMPILE = $(inc_progress)
+        ULTIMAKE.POSTCOMPILE = || $(RM) $(@:%.o=%.dep)$(inc_progress)
+#         ULTIMAKE.POSTCOMPILE = $(inc_progress)
 
         ULTIMAKE.PRELINK  = @printf '$(COLOR_LINK)$1$(COLOR_NONE)\n'
         ULTIMAKE.POSTLINK = && printf '[%3s] Built target $@\n' '$(call percentage,$(PROGRESS),$(load_progress))'
