@@ -123,7 +123,7 @@ ULTIMAKE.POSTLINK        = && printf 'Built target $@\n'
 -include $(ULTIMAKE.PATH)/ultimake-fancy.mk
 
 #-----------------------------------------------------------------------
-.PHONY : all clean print
+.PHONY : all clean
 
 all : $(foreach target,$(TARGETS), $($(target)))
 
