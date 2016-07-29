@@ -21,8 +21,8 @@ endif
         inc_progress  = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc))
 
     # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50%
-        percentage = $(shell echo $(1)00/$(2) | bc)%
-#         percentage = $(1)/$(2)
+#         percentage = $(shell echo $(1)00/$(2) | bc)%
+        percentage = $(1)/$(2)
 
         define ULTIMAKE.PREDEPENDENCY =
             $(inc_progress)
@@ -34,8 +34,8 @@ endif
         define ULTIMAKE.PRECOMPILE =
              @printf '[%3s] $(COLOR_BUILD)$1$(COLOR_NONE)\n' '$(call percentage,$(PROGRESS),$(load_progress))'
         endef
-        ULTIMAKE.POSTCOMPILE = || $(RM) $(@:%.o=%.dep)$(inc_progress)
-#         ULTIMAKE.POSTCOMPILE = $(inc_progress)
+#         ULTIMAKE.POSTCOMPILE = || $(RM) $(@:%.o=%.dep)$(inc_progress) # doesn't work as intended
+        ULTIMAKE.POSTCOMPILE = $(inc_progress)
 
         ULTIMAKE.PRELINK  = @printf '$(COLOR_LINK)$1$(COLOR_NONE)\n'
         ULTIMAKE.POSTLINK = && printf '[%3s] Built target $@\n' '$(call percentage,$(PROGRESS),$(load_progress))'
