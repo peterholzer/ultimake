@@ -17,7 +17,7 @@ endif
         NUM_OF_SOURCES := $(words $(foreach target,$(TARGETS), $($(target).SOURCE_FILES)))
         PROGRESS := 0
         PROGRESS_FILE := $(OUT_DIR)/ultimake-rebuild-count
-        load_progress = $(shell cat $(PROGRESS_FILE))
+        load_progress = $(shell cat $(PROGRESS_FILE) 2> /dev/null || echo "1")
         inc_progress  = $(eval PROGRESS := $(shell echo $(PROGRESS)+1 | bc))
 
     # calculate the percentage of $1 relative to $2, $(call percentage,1,2) -> 50%
