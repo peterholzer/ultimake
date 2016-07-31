@@ -69,6 +69,10 @@ make_dir = $(AT)-$(MKDIR) $$(@D)
 #-----------------------------------------------------------------------
 define tool_list
 
+#########################################################################
+## $1
+#########################################################################
+
 $1.AR  ?= $$(AR)
 $1.AS  ?= $$(AS)
 $1.CC  ?= $$(CC)
@@ -87,9 +91,9 @@ endef
 $(eval $(foreach target,$(TARGETS),$(call tool_list,$(target))))
 
 #-----------------------------------------------------------------------
-# Create lists of generated files
 define file_list1
 
+# Create lists of generated files
 $1.DEP := $(patsubst %,$(OUT_DIR)/%.dep,$($1.SOURCE_FILES))
 $1.OBJ := $(patsubst %,$(OUT_DIR)/%.o,  $($1.SOURCE_FILES))
 
@@ -97,9 +101,9 @@ endef
 $(eval $(foreach target,$(TARGETS),$(call file_list1,$(target))))
 
 #-----------------------------------------------------------------------
-# filter Assembler/C/C++ objects and dependencies
 define file_list2
 
+# filter Assembler/C/C++ objects and dependencies
 $1.DEP_AS  := $(filter %.S.dep, $($1.DEP))
 $1.DEP_C   := $(filter %.c.dep, $($1.DEP))
 $1.DEP_CXX := $(filter %.cpp.dep, $($1.DEP))
@@ -133,8 +137,8 @@ clean :
 
 
 #-----------------------------------------------------------------------
-# create static library from object files
 define static_lib
+# create static library from object files
 $($1) : $($1.OBJ)
 	$(make_dir)
 	$(AT)$(RM) $$@
@@ -142,16 +146,16 @@ $($1) : $($1.OBJ)
 	$(AT)$$($1.AR) $$($1.ARFLAGS) $$@ $$^ $$(ULTIMAKE.POSTLINK)
 endef
 
-# create shared library from object files
 define shared_lib
+# create shared library from object files
 $($1) : $($1.OBJ)
 	$(make_dir)
 	$(call ULTIMAKE.PRELINK,Linking C/CXX shared library $$@)
 	$(AT)$$($1.CXX) -shared $$($1.TARGET_ARCH) $$^ $$($1.LDFLAGS) -o $$@ $$(ULTIMAKE.POSTLINK)
 endef
 
-# link object files into binary
 define executable
+# link object files into binary
 $($1) : $($1.OBJ)
 	$(make_dir)
 	$(call ULTIMAKE.PRELINK,Linking CXX executable $$@)
@@ -170,36 +174,44 @@ $(if $(filter %.a, $($1)),$(call static_lib,$1)
 )$(if $(filter %.so,$($1)),$(call shared_lib,$1)
 )$(if $(filter-out %.a %.so,$($1)),$(call executable,$1)
 )$(if $($1.DEP_AS),
+# create dependency files from assembler source files
 $($1.DEP_AS) : $$(OUT_DIR)/%.S.dep : %.S
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
 	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $$(ULTIMAKE.POSTDEPENDENCY)
 )$(if $($1.DEP_C),
+# create dependency files from C source files
 $($1.DEP_C) : $$(OUT_DIR)/%.c.dep : %.c
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
 	$(AT)$$($1.CC) $$(CPPFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $$(ULTIMAKE.POSTDEPENDENCY)
 )$(if $($1.DEP_CXX),
+# create dependency files from C++ source files
 $($1.DEP_CXX) : $$(OUT_DIR)/%.cpp.dep : %.cpp
 	$(make_dir)
 	$$(ULTIMAKE.PREDEPENDENCY)
 	$(AT)$$($1.CXX) $$($1.CPPFLAGS) $$($1.CXXFLAGS) -MF"$$@" -MG -MM -MP -MT"$$@" $$< $(ULTIMAKE.POSTDEPENDENCY)
 )$(if $($1.OBJ_AS),
+# create object files from assembler source files
 $($1.OBJ_AS) : $$(OUT_DIR)/%.S.o : %.S $$(OUT_DIR)/%.S.dep
 	$(make_dir)
 	$$(call ULTIMAKE.PRECOMPILE,Building ASM object $$@)
 	$(AT)$$($1.AS) $$($1.ASFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )$(if $($1.OBJ_C),
+# create object files from C source files
 $($1.OBJ_C) : $$(OUT_DIR)/%.c.o : %.c $$(OUT_DIR)/%.c.dep
 	$(make_dir)
 	$$(call ULTIMAKE.PRECOMPILE,Building C object $$@)
 	$(AT)$$($1.CC) $$($1.CFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )$(if $($1.OBJ_CXX),
+# create object files from C++ source files
 $($1.OBJ_CXX) : $$(OUT_DIR)/%.cpp.o : %.cpp $$(OUT_DIR)/%.cpp.dep
 	$(make_dir)
 	$$(call ULTIMAKE.PRECOMPILE,Building C++ object $$@)
 	$(AT)$$($1.CXX) $$($1.CXXFLAGS) $$($1.CPPFLAGS) $$($1.TARGET_ARCH) -c $$< -o $$@ $$(ULTIMAKE.POSTCOMPILE)
 )
+
+# include generated depency files (or not)
 $(if $(filter clean,$(MAKECMDGOALS)),,-include $($1.DEP))
 
 endef
@@ -209,7 +221,8 @@ $(eval $(foreach t,$(TARGETS),$(call rules_macro,$t)))
 
 
 $(shell mkdir -p $(OUT_DIR))
-$(file > $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call tool_list,$(target))$(call rules_macro,$(target))))
+$(file > $(OUT_DIR)/ultimake-debug.mk,$(foreach target,$(TARGETS),$(call tool_list,$(target))$(call rules_macro,$(target))))
+# $(file > $(OUT_DIR)/ultimake-debug.mk,$(foreach target,$(TARGETS),$(call tool_list,$(target))$(call file_list1,$(target))$(call file_list2,$(target))$(call rules_macro,$(target))))
 # $(file > $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call tool_list,$(target))))
 # $(file >> $(OUT_DIR)/ultimake-static.mk,$(foreach target,$(TARGETS),$(call rules_macro,$(target))))
 
