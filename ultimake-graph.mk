@@ -1,7 +1,7 @@
 
-
-all : $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).png)
-all : $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).svg)
+all : graph
+graph  : $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).png)
+# graph  : $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).svg)
 
 define dependency_graph
 
@@ -21,6 +21,13 @@ endef
 %.svg : %.dot
 	@printf "Rendering '$^' to '$@'\n"
 	$(AT)dot $^ -Tsvg -o $@
+
+.PHONY : clean-graph
+clean  : clean-graph
+clean-graph :
+	$(AT)-$(RM) $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).dot \
+                                             $(OUT_DIR)/$(target).png \
+                                             $(OUT_DIR)/$(target).svg)
 
 
 $(eval $(foreach t,$(TARGETS),$(call dependency_graph,$t)))
