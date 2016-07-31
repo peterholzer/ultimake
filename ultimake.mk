@@ -124,7 +124,6 @@ ULTIMAKE.POSTCOMPILE    :=
 ULTIMAKE.PRELINK         = @printf '$(COLOR_LINK)$1$(COLOR_NONE)\n'
 ULTIMAKE.POSTLINK        = && printf 'Built target $@\n'
 
--include $(ULTIMAKE.PATH)/ultimake-fancy.mk
 
 #-----------------------------------------------------------------------
 .PHONY : all clean
@@ -135,6 +134,8 @@ clean :
 	@echo 'Cleaning ...'
 	$(AT)-$(RM) $(foreach target, $(TARGETS), $($(target)) $($(target).OBJ) $($(target).DEP))
 
+-include $(ULTIMAKE.PATH)/ultimake-fancy.mk
+-include $(ULTIMAKE.PATH)/ultimake-graph.mk
 
 #-----------------------------------------------------------------------
 define static_lib
