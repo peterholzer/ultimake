@@ -1,8 +1,5 @@
 
 
-
-
-
 # Nothin special here
 # CPPFLAGS +=
 CFLAGS   := -std=c11
@@ -15,9 +12,9 @@ ARFLAGS  := rs
 
 
 
-
-
 # The target 'all' depends on modules/libs defined in TARGETS
+
+# The default target will remain the target of the first rule
 
 # TARGETS += <Module>               defines a new target
 # <Module> = ./bin/executable       the resulting binary/library file
@@ -36,20 +33,27 @@ libFoo.CPPFLAGS  = $(libFoo.INCLUDE)
 #libFoo.CXX      = g++
 
 
+
 TARGETS += libBar
+
 libBar   = ./lib/libbar.a
 libBar.SOURCES  = ./lib/libbar/
 libBar.INCLUDE  = -I./lib/libbar/
 libBar.CPPFLAGS = $(libBar.INCLUDE)
 
+
+
 TARGETS += libAss
+
 libAss   = ./lib/libass.a
 libAss.SOURCES  = ./lib/libass/
 libAss.INCLUDE  = -I./lib/libass/
 libAss.CPPFLAGS = $(libAss.INCLUDE)
 
 
+
 TARGETS += App1
+
 App1     = App1.bin
 App1.SOURCES  = src/
 App1.CPPFLAGS = -I./lib/ $(libFoo.INCLUDE) $(libBar.INCLUDE) $(libAss.INCLUDE)
@@ -57,6 +61,10 @@ App1.LDFLAGS  = -L.
 #App1.CC  =
 #App1.CXX =
 #App1.LD  =
+
+# will link App1 to libFoo.a and libBar.a
+$(App1) : $(libFoo) $(libBar) $(libAss)
+
 
 
 # print build commands
@@ -66,5 +74,3 @@ VERBOSE := 1
 # after defining targets and setting ultimake variables and before module dependency description
 include ../ultimake.mk
 
-# will link App1 to libFoo.a and libBar.a
-$(App1) : $(libFoo) $(libBar) $(libAss)
