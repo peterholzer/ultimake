@@ -11,6 +11,7 @@ use Getopt::Long;
 Getopt::Long::Configure ("bundling");
 # use Data::Dumper;   # for '--verbose' debugging output
 
+# TODO: HEADERS FIRST!!!
 # my $usage = "Usage: $0 [OPTION...] FILE... [ -o FILE ]\n\n";
 my $usage = "Usage: find . -iname '*.hpp' -o -name '*.h' -o -iname '*.cpp' -o -iname '*.c'  | xargs $0 | dot -Tpng -o OUTPUT_FILE\n\n";
 
@@ -44,10 +45,26 @@ if($options{'output'})
 }
 
 
+# edge style
+$style_header_dependency     = "[penwidth = 3,color=\"#FF444488\"]";
+$style_source_dependency     = "[penwidth = 2,color=\"#00FF0088\"]";
+
+# node style
+$style_file_in_folder = "[style=\"filled\",fillcolor=\"#FFFFFF\"]";
+$style_file_root      = "[style=\"filled\",fillcolor=\"#FFFFFF\"]";
+
+# subgraph style
+$style_folder =
+        "penwidth = 0;
+        style=\"filled\";
+        fillcolor=\"#F0E0C0\";\n";
+
+
 print "digraph g\n{\n";
 
 @extension_list = qw(.c .cpp .h .hpp);
 
+# for each filename given as argument
 foreach (@ARGV)
 {
     my $target = $_;
@@ -63,6 +80,7 @@ foreach (@ARGV)
 
     while (<$fd>)
     {
+        # include statements with double quotes
         if( $_ =~ /^\s*#include\s*\"(.*)\"/ )
         # if( $_ =~ /^\s*#include\s*\"(.*)\"/ or
             # $_ =~ /^\s*#include\s*<(.*)>/ )
@@ -77,11 +95,11 @@ foreach (@ARGV)
             if ($target_ext eq ".h"
              or $target_ext eq ".hpp" )
             {
-                print "    \"$target_file\" -> \"$prereq_file\"[penwidth = 2,color=\"#808080\"]\n";
+                print "    \"$target_file\" -> \"$prereq_file\"$style_header_dependency\n";
             }
             elsif (($target_ext eq ".c" or $target_ext eq ".cpp") and ($prereq_file ne $target_file))
             {
-                print "    \"$target_file\" -> \"$prereq_file\"[penwidth = 1,color=\"#C0C0C0\"]\n";
+                print "    \"$target_file\" -> \"$prereq_file\"$style_source_dependency\n";
             }
             else
             {
@@ -92,9 +110,9 @@ foreach (@ARGV)
         # include dependencies on system headers
         elsif ( $options{'system-headers'} && $_ =~ /^\s*#include\s*<(.*)>/ )
         {
-            print_folder_subgraph2("/usr/include/.../" . $1);
+            print_folder_subgraph("/usr/include/.../" . $1);
             my ($prereq_file, $prereq_dir) = fileparse($1);
-            print "    \"$target_file\" -> \"$prereq_file\"[penwidth = 1,color=\"#C0C0C0\"]\n";
+            print "    \"$target_file\" -> \"$prereq_file\"$style_source_dependency\n";
         }
 
     }
@@ -108,7 +126,7 @@ exit(0);
 
 
 
-
+# Create a valid C/Dot variable name
 sub mangle
 {
     my ($name) = @_;
@@ -122,41 +140,24 @@ sub print_folder_subgraph
 {
     my ($path) = @_;
     my ($file, $dir, $ext) = fileparse($path, @extension_list);
-    return if $dir eq "./";
+    # return if $dir eq "./";
+    if($dir eq "./")
     {
-
+        print("\"$file\"$style_file_root;\n");
+    }
+    else
+    {
         my $subgraph_name = mangle($dir);
         print(
 "    subgraph cluster_$subgraph_name
     {
         label = \"$dir\";
-        penwidth = 0;
-        style=\"filled\";
-        \"$file\"[style=\"filled\",fillcolor=\"#FFFFFF\"];
-        fillcolor=\"#F0E0C0\"
+        $style_folder
+        \"$file\"$style_file_in_folder;
     }\n");
     }
 }
 
 
-sub print_folder_subgraph2
-{
-    my ($path) = @_;
-    my ($file, $dir, $ext) = fileparse($path, @extension_list);
-    return if $dir eq "./";
-    {
-
-        my $subgraph_name = mangle($dir);
-        print(
-"    subgraph cluster_$subgraph_name
-    {
-        label = \"$dir\";
-        penwidth = 0;
-        style=\"filled\";
-        \"$file\"[style=\"filled\",fillcolor=\"#FFFFFF\"];
-        fillcolor=\"#E0E0F0\"
-    }\n");
-    }
-}
 
 
