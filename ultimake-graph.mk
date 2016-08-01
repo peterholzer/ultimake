@@ -1,5 +1,6 @@
 
-all : graph
+.PHONY : graph
+# all : graph
 graph  : $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).png)
 # graph  : $(foreach target,$(TARGETS), $(OUT_DIR)/$(target).svg)
 
